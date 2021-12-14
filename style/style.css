@@ -1,0 +1,51 @@
+input:focus,
+select:focus,
+textarea:focus,
+button:focus {
+  outline: none;
+}
+.list-container {
+  width: 100%;
+  background: rgba(128, 128, 128, 0.438);
+}
+.footer {
+  position: fixed;
+  bottom: 0;
+  height: 45px;
+  width: 100%;
+  background: grey;
+  display: flex;
+  align-items: center;
+  padding: 0 10px;
+  justify-content: space-between;
+}
+.footer > input {
+  height: 35px;
+  width: 50%;
+}
+.add-control {
+  color: white;
+  margin: 0 5px;
+  background: rgba(0, 0, 0, 0.432);
+  padding: 10px;
+  border-radius: 4px;
+}
+.add-control:hover {
+  cursor: pointer;
+  background: black;
+}
+::-webkit-scrollbar {
+  display: none;
+}
+.check {
+  margin-right: 20px;
+}
+.list-item {
+  border-bottom: 0.5px solid rgba(0, 0, 0, 0.473);
+  font-size: 1.5rem;
+  padding: 9px;
+}
+.list-item:hover {
+  background: rgba(0, 0, 0, 0.521);
+  color: white;
+}
