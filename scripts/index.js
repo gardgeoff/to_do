@@ -1,10 +1,61 @@
 $(function () {
+  // initialize empty array to hold to do list data
   let obj = [];
+  // send signal to main and retrieve the locally saved data
+  // assign data to obj array and rebuild() to generate the screen
   window.api.send("load", true);
   window.api.receive("loadedData", function (data) {
     obj = data;
     rebuild();
   });
+  function rebuild() {
+    $(".list-container").empty();
+    let banners = [];
+    let items = [];
+    obj.map((item) => {
+      if (item.priority) {
+        !banners.includes(item.priority)
+          ? banners.push(`${item.priority}`)
+          : null;
+      }
+      items.push(item);
+    });
+    banners.sort();
+    // append the priority banners
+    banners.map((item) => {
+      $(".list-container").append(
+        `
+        <div class="sortable" id=${item}>
+          <div class="banner banner-${item}">${item}</div>
+        </div>`
+      );
+    });
+    // makeSortable() causes lists to be drag and drop
+    makeSortable();
+    // append the to do items to their respective banners
+    items.map((item) => {
+      $("#" + item.priority).append(
+        `<div
+        uid=${item.created} 
+        class="list-item"
+        key=${item.priority}
+        >
+          <input connected="${item.created}" class="check" type="checkbox"/><span class="line-through">${item.key}</span>
+          <button class="del-item btn btn-danger">delete</button>
+        </div>`
+      );
+      $(".del-item").css("visibility", "hidden");
+      if (item.checked) {
+        $(`input[connected="${item.created}"]`)
+          .prop("checked", true)
+          .closest(".list-item")
+          .find(".line-through")
+          .css("textDecoration", "line-through");
+      }
+    });
+  }
+  // console.log(moment(Date.now()).format("YYYY/MM/DD"));
+  // grab inputs and create a new to do item
   function addNew() {
     let priority = $("#priority").val().trim();
     let todo = $("#todotext").val().trim();
@@ -61,50 +112,7 @@ $(function () {
   function updateSortOrderJS(param) {
     obj = param;
   }
-  function rebuild() {
-    $(".list-container").empty();
-    let banners = [];
-    let items = [];
-    obj.map((item) => {
-      if (item.priority) {
-        !banners.includes(item.priority)
-          ? banners.push(`${item.priority}`)
-          : null;
-      }
-      items.push(item);
-    });
-    banners.sort();
-
-    banners.map((item) => {
-      $(".list-container").append(
-        `
-        <div class="sortable" id=${item}>
-          <div class="banner banner-${item}">${item}</div>
-        </div>`
-      );
-    });
-    makeSortable();
-    items.map((item) => {
-      $("#" + item.priority).append(
-        `<div
-        uid=${item.created} 
-        class="list-item"
-        key=${item.priority}
-        >
-          <input connected="${item.created}" class="check" type="checkbox"/><span class="line-through">${item.key}</span>
-          <button class="del-item btn btn-danger">delete</button>
-        </div>`
-      );
-      $(".del-item").css("visibility", "hidden");
-      if (item.checked) {
-        $(`input[connected="${item.created}"]`)
-          .prop("checked", true)
-          .closest(".list-item")
-          .find(".line-through")
-          .css("textDecoration", "line-through");
-      }
-    });
-  }
+  // click event binders
   $("#priority, #todotext, #project, #context").on("keydown", function (e) {
     if (e.key === "Enter") {
       addNew();
@@ -139,11 +147,7 @@ $(function () {
     }
     window.api.send("saveFile", { data: obj });
   });
-  setInterval(() => {
-    if (obj.length > 0) {
-      window.api.send("saveFile", { data: obj });
-    }
-  }, 1800000);
+
   let keys = {};
   $(document).on("keydown", function (e) {
     if (e.keyCode === 17 || e.which === 83) {
@@ -184,4 +188,10 @@ $(function () {
     .on("mouseout", ".list-item", function () {
       $(this).find(".del-item:first").css("visibility", "hidden");
     });
+  // 30 minute auto save interval
+  setInterval(() => {
+    if (obj.length > 0) {
+      window.api.send("saveFile", { data: obj });
+    }
+  }, 1800000);
 });

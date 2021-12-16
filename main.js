@@ -1,12 +1,84 @@
-const { app, BrowserWindow, ipcMain, globalShortcut } = require("electron");
+const {
+  app,
+  BrowserWindow,
+  Menu,
+  ipcMain,
+  globalShortcut
+} = require("electron");
 const fs = require("fs");
 const path = require("path");
+const excelJs = require("exceljs");
+
+const workbook = new excelJs.Workbook();
+const worksheet = workbook.addWorksheet("to_do");
 let to_do;
 fs.writeFile("./to_do.json", "[]", { flag: "wx" }, function (err) {
   let rawdata = fs.readFileSync("to_do.json");
   to_do = JSON.parse(rawdata);
 });
+worksheet.columns = [
+  { header: "S no.", key: "s_no", width: 10 },
+  { header: "key", key: "key", width: 10 },
+  { header: "priority", key: "priority", width: 10 },
+  { header: "project", key: "project", width: 10 },
+  { header: "context", key: "context", width: 10 }
+];
+let counter = 1;
+function writeXl() {
+  to_do.forEach((item) => {
+    item.s_no = counter;
+    worksheet.addRow(item);
+    counter++;
+  });
+  try {
+    const data = workbook.xlsx.writeFile(`./to_do.xlsx`).then(() => {
+      console.log("success");
+    });
+  } catch (err) {
+    console.log("error");
+  }
+}
+function writeWord() {}
+function writeTxt() {}
 async function createWindow() {
+  Menu.setApplicationMenu(
+    Menu.buildFromTemplate([
+      {
+        label: "file",
+        submenu: [
+          {
+            label: "export",
+            submenu: [
+              {
+                label: "excel",
+                click() {
+                  writeXl();
+                }
+              },
+              {
+                label: "word",
+                click() {
+                  writeWord();
+                }
+              },
+              {
+                label: "txt",
+                click() {
+                  writeTxt();
+                }
+              }
+            ]
+          },
+          {
+            label: "quit",
+            click() {
+              app.quit();
+            }
+          }
+        ]
+      }
+    ])
+  );
   win = new BrowserWindow({
     width: 1024,
     height: 768,
@@ -21,6 +93,7 @@ async function createWindow() {
 }
 app.whenReady().then(() => {
   createWindow();
+
   ipcMain.on("load", (e, args) => {
     let rawdata = fs.readFileSync("to_do.json");
     to_do = JSON.parse(rawdata);
@@ -37,7 +110,6 @@ app.whenReady().then(() => {
     tempObj.map((item) => {
       let line = item.key + "\r\n";
       if (item.checked) {
-        console.log("i'm checked");
         line = "x " + line;
       }
       tempString += line;
