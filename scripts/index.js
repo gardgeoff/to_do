@@ -3,70 +3,141 @@ $(function () {
   window.api.send("load", true);
   window.api.receive("loadedData", function (data) {
     obj = data;
-    console.log(data);
-    data.map((item) => {
-      let listItem = `<div connected=${item.key} class="list-item"><input connected=${item.key} class="check" type="checkbox"/>${item.key}</div>`;
-      $(".list-container").append(listItem);
-      $(`input[connected=${item.key}]`).prop("checked", item.checked);
-    });
+    rebuild();
   });
-  console.log("jquery loaded");
-  $(".sortable").sortable({
-    update: function () {
-      var tempItems = [];
-
-      $(".sortable")
-        .children()
-        .each(function (i) {
-          let key = $(this).attr("connected");
-
-          let checked = $(this).find("input:first").is(":checked");
-          tempItems.push({ key, checked });
-        });
-      updateSortOrderJS(tempItems);
+  function addNew() {
+    let priority = $("#priority").val().trim();
+    let todo = $("#todotext").val().trim();
+    let project = $("#project").val().trim();
+    let context = $("#context").val().trim();
+    let created = Date.now();
+    let prioNoParenthesis;
+    if (priority && /^[a-zA-Z]+$/.test(priority)) {
+      let tempPrio = priority.match(/^[a-zA-Z]+$/)[0];
+      tempPrio = tempPrio.toUpperCase();
+      prioNoParenthesis = tempPrio;
+      tempPrio = "(" + tempPrio + ")";
+      priority = tempPrio;
     }
-  });
-  function updateSortOrderJS(param) {
-    console.log(param);
-    obj = param;
-    console.log(obj);
+    if (project && !project.startsWith("@")) {
+      project = "@" + project;
+    }
+    if (context && !context.startsWith("+")) {
+      context = "+" + context;
+    }
+    if (todo) {
+      let totalString = `${priority} ${todo} ${project} ${context}`.trim();
+      obj.push({
+        key: totalString,
+        priority: prioNoParenthesis,
+        project,
+        created,
+        context,
+        checked: false
+      });
+      rebuild();
+      $("#priority, #todotext, #project, #context").val("");
+    }
   }
-
-  $(".add-input").on("keydown", function (e) {
-    let value = $(".add-input").val();
-    if (e.key === "Enter") {
-      if (value != "") {
-        let listItem = `<div connected=${value} checked="false" class="list-item"><input connected=${value} class="check" type="checkbox"/>${value}</div>`;
-        $(".list-container").append(listItem);
-        $(".add-input").val("");
-        obj.push({ key: value, checked: false });
+  function makeSortable() {
+    $(".sortable").sortable({
+      cancel: ".banner",
+      update: function () {
+        var tempItems = [];
+        $(".sortable")
+          .children()
+          .each(function (i) {
+            let connection = parseInt($(this).attr("uid"));
+            obj.map((item) => {
+              if (item.created == connection) {
+                tempItems.push(item);
+              }
+            });
+          });
+        updateSortOrderJS(tempItems);
       }
+    });
+  }
+  function updateSortOrderJS(param) {
+    obj = param;
+  }
+  function rebuild() {
+    $(".list-container").empty();
+    let banners = [];
+    let items = [];
+    obj.map((item) => {
+      if (item.priority) {
+        !banners.includes(item.priority)
+          ? banners.push(`${item.priority}`)
+          : null;
+      }
+      items.push(item);
+    });
+    banners.sort();
+
+    banners.map((item) => {
+      $(".list-container").append(
+        `
+        <div class="sortable" id=${item}>
+          <div class="banner banner-${item}">${item}</div>
+        </div>`
+      );
+    });
+    makeSortable();
+    items.map((item) => {
+      $("#" + item.priority).append(
+        `<div
+        uid=${item.created} 
+        class="list-item"
+        key=${item.priority}
+        >
+          <input connected="${item.created}" class="check" type="checkbox"/><span class="line-through">${item.key}</span>
+          <button class="del-item btn btn-danger">delete</button>
+        </div>`
+      );
+      $(".del-item").css("visibility", "hidden");
+      if (item.checked) {
+        $(`input[connected="${item.created}"]`)
+          .prop("checked", true)
+          .closest(".list-item")
+          .find(".line-through")
+          .css("textDecoration", "line-through");
+      }
+    });
+  }
+  $("#priority, #todotext, #project, #context").on("keydown", function (e) {
+    if (e.key === "Enter") {
+      addNew();
     }
+  });
+  $("#submit").on("click", function () {
+    addNew();
   });
   $(document).on("click", ".check", function () {
     let isChecked = $(this).is(":checked");
     if (isChecked) {
-      $(this).closest(".list-item").css({
+      $(this).closest(".list-item").find(".line-through").css({
         textDecoration: "line-through"
       });
       let connected = $(this).attr("connected");
       for (let i = 0; i < obj.length; i++) {
-        if (obj[i].key == connected) {
+        if (obj[i].created == connected) {
           obj[i].checked = true;
         }
       }
     } else {
-      $(this).closest(".list-item").css({
+      $(this).closest(".list-item").find(".line-through").css({
         textDecoration: "none"
       });
-      $(this).closest(".list-item").attr("checked", "false");
+      $(this).closest("div").attr("checked", "false");
       let connected = $(this).attr("connected");
       for (let i = 0; i < obj.length; i++) {
-        if (obj[i].key == connected) {
+        if (obj[i].created == connected) {
           obj[i].checked = false;
         }
       }
     }
+    window.api.send("saveFile", { data: obj });
   });
   setInterval(() => {
     if (obj.length > 0) {
@@ -74,8 +145,8 @@ $(function () {
     }
   }, 1800000);
   let keys = {};
-  $(document).keydown(function (e) {
-    if (e.which === 17 || e.which === 83) {
+  $(document).on("keydown", function (e) {
+    if (e.keyCode === 17 || e.which === 83) {
       keys[e.which] = true;
     }
     if (keys[17] && keys[83]) {
@@ -86,4 +157,31 @@ $(function () {
   $(document).keyup(function (e) {
     delete keys[e.which];
   });
+  $(".search-input").on("keyup", (e) => {
+    let totalSearch = $(".search-input").val();
+    $(".list-item").each(function () {
+      let content = $(this).text().toUpperCase();
+      totalSearch = totalSearch.toUpperCase();
+      if (!content.includes(totalSearch)) {
+        $(this).hide();
+      } else {
+        $(this).show();
+      }
+    });
+  });
+  $(document).on("click", ".del-item", function () {
+    let uid = $(this).closest(".list-item").attr("uid");
+    $(this).closest(".list-item").hide();
+    obj = obj.filter((item) => {
+      return item.created != uid;
+    });
+    rebuild();
+  });
+  $(document)
+    .on("mouseover", ".list-item", function () {
+      $(this).find(".del-item:first").css("visibility", "visible");
+    })
+    .on("mouseout", ".list-item", function () {
+      $(this).find(".del-item:first").css("visibility", "hidden");
+    });
 });

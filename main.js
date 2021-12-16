@@ -1,14 +1,11 @@
-const {
-  app,
-  BrowserWindow,
-  Menu,
-  ipcMain,
-  globalShortcut
-} = require("electron");
+const { app, BrowserWindow, ipcMain, globalShortcut } = require("electron");
 const fs = require("fs");
 const path = require("path");
-let to_do = require("./scripts/to_do.json");
-let win;
+let to_do;
+fs.writeFile("./to_do.json", "[]", { flag: "wx" }, function (err) {
+  let rawdata = fs.readFileSync("to_do.json");
+  to_do = JSON.parse(rawdata);
+});
 async function createWindow() {
   win = new BrowserWindow({
     width: 1024,
@@ -25,14 +22,28 @@ async function createWindow() {
 app.whenReady().then(() => {
   createWindow();
   ipcMain.on("load", (e, args) => {
+    let rawdata = fs.readFileSync("to_do.json");
+    to_do = JSON.parse(rawdata);
     win.webContents.send("loadedData", to_do);
   });
   ipcMain.on("saveFile", (e, args) => {
     let tempObj = args.data;
     console.log("saving");
 
-    fs.writeFile("./scripts/to_do.json", JSON.stringify(tempObj), (err) => {
+    fs.writeFile("./to_do.json", JSON.stringify(tempObj), (err) => {
       if (err) throw err;
+    });
+    let tempString = ``;
+    tempObj.map((item) => {
+      let line = item.key + "\r\n";
+      if (item.checked) {
+        console.log("i'm checked");
+        line = "x " + line;
+      }
+      tempString += line;
+    });
+    fs.writeFile("./to_do.txt", tempString, function (err) {
+      if (err) console.log(err);
     });
   });
   globalShortcut.register("f5", () => {
