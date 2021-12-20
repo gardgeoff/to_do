@@ -1,4 +1,1 @@
-(A) b @c
-(B) test @test +test
-(C) test @d +test
-(Z) test @test +test
+(A) 2021-12-20 test +@test @+test due:2021-12-31 

@@ -76,6 +76,17 @@ async function createWindow() {
             }
           }
         ]
+      },
+      {
+        label: "edit",
+        submenu: [
+          {
+            label: "open dev tools",
+            click() {
+              win.openDevTools();
+            }
+          }
+        ]
       }
     ])
   );
@@ -89,6 +100,7 @@ async function createWindow() {
       preload: path.join(__dirname, "./preload.js")
     }
   });
+  win.webContents.openDevTools();
   win.loadFile("index.html");
 }
 app.whenReady().then(() => {
@@ -108,7 +120,10 @@ app.whenReady().then(() => {
     });
     let tempString = ``;
     tempObj.map((item) => {
-      let line = item.key + "\r\n";
+      let line =
+        `(${item.priority || ""}) ${item.date || ""} ${item.text || ""} +${
+          item.project || ""
+        } @${item.context || ""} ${item.due || ""} \r\n` || "";
       if (item.checked) {
         line = "x " + line;
       }

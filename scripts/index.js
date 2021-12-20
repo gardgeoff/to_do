@@ -1,5 +1,5 @@
 $(function () {
-  // initialize empty array to hold to do list data
+  // initialize empty array to hold "to do list" data
   let obj = [];
   // send signal to main and retrieve the locally saved data
   // assign data to obj array and rebuild() to generate the screen
@@ -8,9 +8,10 @@ $(function () {
     obj = data;
     rebuild();
   });
+
   function rebuild() {
     $(".list-container").empty();
-    let banners = [];
+    let banners = ["no_priority"];
     let items = [];
     obj.map((item) => {
       if (item.priority) {
@@ -20,31 +21,42 @@ $(function () {
       }
       items.push(item);
     });
-    banners.sort();
-    // append the priority banners
-    banners.map((item) => {
-      $(".list-container").append(
-        `
-        <div class="sortable" id=${item}>
-          <div class="banner banner-${item}">${item}</div>
-        </div>`
-      );
+
+    items.sort((x, y) => {
+      return x.checked - y.checked;
     });
+    items.sort((x, y) => {
+      return x.priority < y.priority ? -1 : x.priority > y.priority ? 1 : 0;
+    });
+    // append the priority banners
+
     // makeSortable() causes lists to be drag and drop
     makeSortable();
     // append the to do items to their respective banners
+    banners.push("");
     items.map((item) => {
-      $("#" + item.priority).append(
+      let hasPrio =
+        item.priority == undefined
+          ? "group-no_priority"
+          : "group-" + item.priority;
+      $(".list-container").append(
         `<div
         uid=${item.created} 
-        class="list-item"
+        class="list-item ${hasPrio}"
         key=${item.priority}
         >
-          <input connected="${item.created}" class="check" type="checkbox"/><span class="line-through">${item.key}</span>
+          <input connected="${item.created}" class="check" type="checkbox"/>
+          <span class="line-through">
+            ${item.priority || ""} ${item.date} ${item.text} ${
+          item.project || ""
+        } ${item.context || ""} ${item.due || ""}
+          </span>
+          <button class="edit-item btn btn-primary">edit</button>
           <button class="del-item btn btn-danger">delete</button>
         </div>`
       );
       $(".del-item").css("visibility", "hidden");
+      $(".edit-item").css("visibility", "hidden");
       if (item.checked) {
         $(`input[connected="${item.created}"]`)
           .prop("checked", true)
@@ -53,16 +65,25 @@ $(function () {
           .css("textDecoration", "line-through");
       }
     });
+    banners.map((item) => {
+      let insert = $(".group-" + item).first();
+      let string = `<div class="banner banner-${item}">${item}</div>`;
+      $(string).insertBefore(insert);
+    });
   }
-  // console.log(moment(Date.now()).format("YYYY/MM/DD"));
+
   // grab inputs and create a new to do item
   function addNew() {
     let priority = $("#priority").val().trim();
     let todo = $("#todotext").val().trim();
+    let due = $("#due").val() == "" ? "" : `due:${$("#due").val()}`;
     let project = $("#project").val().trim();
     let context = $("#context").val().trim();
     let created = Date.now();
+    let date = moment(created).format("YYYY-MM-DD");
     let prioNoParenthesis;
+
+    // test if priority exists and is A-Z
     if (priority && /^[a-zA-Z]+$/.test(priority)) {
       let tempPrio = priority.match(/^[a-zA-Z]+$/)[0];
       tempPrio = tempPrio.toUpperCase();
@@ -76,14 +97,19 @@ $(function () {
     if (context && !context.startsWith("+")) {
       context = "+" + context;
     }
+
     if (todo) {
-      let totalString = `${priority} ${todo} ${project} ${context}`.trim();
+      let totalString =
+        `${priority} ${date} ${todo} ${project} ${context} ${due}`.trim();
       obj.push({
         key: totalString,
+        text: todo,
+        date,
         priority: prioNoParenthesis,
         project,
         created,
         context,
+        due,
         checked: false
       });
       rebuild();
@@ -91,23 +117,38 @@ $(function () {
     }
   }
   function makeSortable() {
-    $(".sortable").sortable({
-      cancel: ".banner",
-      update: function () {
-        var tempItems = [];
-        $(".sortable")
-          .children()
-          .each(function (i) {
-            let connection = parseInt($(this).attr("uid"));
-            obj.map((item) => {
-              if (item.created == connection) {
-                tempItems.push(item);
-              }
+    $(".sortable")
+      .sortable({
+        contain: "parent",
+
+        stop: function (event, ui) {
+          let uid = $(ui.item).attr("uid");
+          let newPrio = $(ui.item).prevAll(".banner").text();
+          console.log(uid);
+          console.log(newPrio);
+          for (let i = 0; i < obj.length; i++) {
+            if (obj[i].created == uid) {
+              obj[i].priority = newPrio;
+            }
+          }
+          rebuild();
+        },
+        update: function () {
+          var tempItems = [];
+          $(".sortable")
+            .children()
+            .each(function (i) {
+              let connection = parseInt($(this).attr("uid"));
+              obj.map((item) => {
+                if (item.created == connection) {
+                  tempItems.push(item);
+                }
+              });
             });
-          });
-        updateSortOrderJS(tempItems);
-      }
-    });
+          updateSortOrderJS(tempItems);
+        }
+      })
+      .disableSelection();
   }
   function updateSortOrderJS(param) {
     obj = param;
@@ -118,6 +159,7 @@ $(function () {
       addNew();
     }
   });
+
   $("#submit").on("click", function () {
     addNew();
   });
@@ -131,6 +173,7 @@ $(function () {
       for (let i = 0; i < obj.length; i++) {
         if (obj[i].created == connected) {
           obj[i].checked = true;
+          rebuild();
         }
       }
     } else {
@@ -142,19 +185,18 @@ $(function () {
       for (let i = 0; i < obj.length; i++) {
         if (obj[i].created == connected) {
           obj[i].checked = false;
+          rebuild();
         }
       }
     }
     window.api.send("saveFile", { data: obj });
   });
-
   let keys = {};
   $(document).on("keydown", function (e) {
     if (e.keyCode === 17 || e.which === 83) {
       keys[e.which] = true;
     }
     if (keys[17] && keys[83]) {
-      console.log("saving");
       window.api.send("saveFile", { data: obj });
     }
   });
@@ -181,12 +223,18 @@ $(function () {
     });
     rebuild();
   });
+  $(document).on("click", ".edit-item", function () {
+    let uid = $(this).closest(".list-item").attr("uid");
+    let entry = obj.find((element) => element.created == uid);
+  });
   $(document)
     .on("mouseover", ".list-item", function () {
       $(this).find(".del-item:first").css("visibility", "visible");
+      $(this).find(".edit-item:first").css("visibility", "visible");
     })
     .on("mouseout", ".list-item", function () {
       $(this).find(".del-item:first").css("visibility", "hidden");
+      $(this).find(".edit-item:first").css("visibility", "hidden");
     });
   // 30 minute auto save interval
   setInterval(() => {
