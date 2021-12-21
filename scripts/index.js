@@ -8,10 +8,9 @@ $(function () {
     obj = data;
     rebuild();
   });
-
   function rebuild() {
     $(".list-container").empty();
-    let banners = ["no_priority"];
+    let banners = [];
     let items = [];
     obj.map((item) => {
       if (item.priority) {
@@ -25,16 +24,29 @@ $(function () {
     items.sort((x, y) => {
       return x.checked - y.checked;
     });
+
     items.sort((x, y) => {
-      return x.priority < y.priority ? -1 : x.priority > y.priority ? 1 : 0;
+      return x.priority < y.priority
+        ? -1
+        : x.priority > y.priority
+        ? 1
+        : !y.priority
+        ? -1
+        : 0;
     });
+
+    console.log(items);
     // append the priority banners
 
     // makeSortable() causes lists to be drag and drop
     makeSortable();
     // append the to do items to their respective banners
-    banners.push("");
+
     items.map((item) => {
+      let handleDue = item.due === "" ? "" : `due:${item.due}`;
+      let handlePoc = item.poc == "" ? "" : `poc:${item.poc}`;
+      let handleSprint = item.sprint == "" ? "" : `sprint:${item.sprint}`;
+
       let hasPrio =
         item.priority == undefined
           ? "group-no_priority"
@@ -44,19 +56,20 @@ $(function () {
         uid=${item.created} 
         class="list-item ${hasPrio}"
         key=${item.priority}
+        text='${item.text}'
+        due=${item.due || ""}
         >
           <input connected="${item.created}" class="check" type="checkbox"/>
-          <span class="line-through">
-            ${item.priority || ""} ${item.date} ${item.text} ${
-          item.project || ""
-        } ${item.context || ""} ${item.due || ""}
+          <span class="line-through"> ${item.priority || ""} ${item.date} ${
+          item.text
+        } ${item.project || ""} ${
+          item.context || ""
+        } ${handlePoc} ${handleSprint} ${handleDue}
           </span>
-          <button class="edit-item btn btn-primary">edit</button>
           <button class="del-item btn btn-danger">delete</button>
         </div>`
       );
       $(".del-item").css("visibility", "hidden");
-      $(".edit-item").css("visibility", "hidden");
       if (item.checked) {
         $(`input[connected="${item.created}"]`)
           .prop("checked", true)
@@ -65,10 +78,24 @@ $(function () {
           .css("textDecoration", "line-through");
       }
     });
+
+    banners.push("no_priority");
     banners.map((item) => {
       let insert = $(".group-" + item).first();
       let string = `<div class="banner banner-${item}">${item}</div>`;
       $(string).insertBefore(insert);
+    });
+    checkDates();
+  }
+  function checkDates() {
+    $(".list-item").each(function (i, obj) {
+      let dueDate = $(obj).attr("due");
+      let now = moment(Date.now()).format("YYYY/MM/DD");
+      let diffInDays = moment(dueDate).diff(now, "days");
+      console.log(diffInDays);
+      if (diffInDays <= 1) {
+        $(this).css({ color: "red" });
+      }
     });
   }
 
@@ -76,13 +103,14 @@ $(function () {
   function addNew() {
     let priority = $("#priority").val().trim();
     let todo = $("#todotext").val().trim();
-    let due = $("#due").val() == "" ? "" : `due:${$("#due").val()}`;
+    let due = $("#due").val() == "" ? "" : `${$("#due").val()}`;
+    let sprint = $("#sprint").val().trim() || "";
+    let poc = $("#poc").val().trim() || "";
     let project = $("#project").val().trim();
     let context = $("#context").val().trim();
     let created = Date.now();
     let date = moment(created).format("YYYY-MM-DD");
     let prioNoParenthesis;
-
     // test if priority exists and is A-Z
     if (priority && /^[a-zA-Z]+$/.test(priority)) {
       let tempPrio = priority.match(/^[a-zA-Z]+$/)[0];
@@ -91,36 +119,33 @@ $(function () {
       tempPrio = "(" + tempPrio + ")";
       priority = tempPrio;
     }
-    if (project && !project.startsWith("@")) {
-      project = "@" + project;
+    if (project && !project.startsWith("+")) {
+      project = "+" + project;
     }
-    if (context && !context.startsWith("+")) {
-      context = "+" + context;
+    if (context && !context.startsWith("@")) {
+      context = "@" + context;
     }
-
     if (todo) {
-      let totalString =
-        `${priority} ${date} ${todo} ${project} ${context} ${due}`.trim();
       obj.push({
-        key: totalString,
-        text: todo,
-        date,
+        checked: false,
         priority: prioNoParenthesis,
+        text: todo,
         project,
-        created,
         context,
+        sprint,
+        poc,
+        created,
         due,
-        checked: false
+        date
       });
       rebuild();
-      $("#priority, #todotext, #project, #context").val("");
+      $("input").val("");
     }
   }
   function makeSortable() {
     $(".sortable")
       .sortable({
         contain: "parent",
-
         stop: function (event, ui) {
           let uid = $(ui.item).attr("uid");
           let newPrio = $(ui.item).prevAll(".banner").text();
@@ -154,11 +179,14 @@ $(function () {
     obj = param;
   }
   // click event binders
-  $("#priority, #todotext, #project, #context").on("keydown", function (e) {
-    if (e.key === "Enter") {
-      addNew();
+  $("#priority, #todotext, #project, #context, #sprint, #poc").on(
+    "keydown",
+    function (e) {
+      if (e.key === "Enter") {
+        addNew();
+      }
     }
-  });
+  );
 
   $("#submit").on("click", function () {
     addNew();
@@ -203,6 +231,13 @@ $(function () {
   $(document).keyup(function (e) {
     delete keys[e.which];
   });
+  $(document).keydown(function(e){
+    delete todo_item[e.which.priority.prop.rebuild];
+    console.log(todo_item);
+    async function(){
+      await rebuild();
+    }
+  })
   $(".search-input").on("keyup", (e) => {
     let totalSearch = $(".search-input").val();
     $(".list-item").each(function () {
@@ -215,6 +250,23 @@ $(function () {
       }
     });
   });
+  $(document).on("click", ".list-item", function (e) {
+    if (this === e.target) {
+      let xPos = e.pageX;
+      let yPos = e.pageY;
+      let text = $(this).attr("text");
+      navigator.clipboard.writeText(text);
+      $("#tooltip").css({
+        top: yPos,
+        left: xPos
+      });
+      $("#tooltip").fadeIn("fast", function () {
+        setTimeout(() => {
+          $("#tooltip").fadeOut("fast");
+        }, 500);
+      });
+    }
+  });
   $(document).on("click", ".del-item", function () {
     let uid = $(this).closest(".list-item").attr("uid");
     $(this).closest(".list-item").hide();
@@ -223,18 +275,13 @@ $(function () {
     });
     rebuild();
   });
-  $(document).on("click", ".edit-item", function () {
-    let uid = $(this).closest(".list-item").attr("uid");
-    let entry = obj.find((element) => element.created == uid);
-  });
+
   $(document)
     .on("mouseover", ".list-item", function () {
       $(this).find(".del-item:first").css("visibility", "visible");
-      $(this).find(".edit-item:first").css("visibility", "visible");
     })
     .on("mouseout", ".list-item", function () {
       $(this).find(".del-item:first").css("visibility", "hidden");
-      $(this).find(".edit-item:first").css("visibility", "hidden");
     });
   // 30 minute auto save interval
   setInterval(() => {

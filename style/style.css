@@ -34,7 +34,6 @@ button:focus {
 
 .footer > input {
   height: 35px;
-  width: 50%;
 }
 
 .banner {
@@ -59,18 +58,21 @@ button:focus {
 #search > ::placeholder {
   color: rgba(255, 255, 255, 0.712);
 }
-#todotext {
-  width: 40%;
+.footer > input {
+  width: auto;
 }
-#project,
 #priority {
   width: 60px;
 }
-#context {
-  width: 20%;
+#project,
+#context,
+#poc,
+#sprint {
+  width: 100px;
 }
-#project {
-  width: 20%;
+#todotext {
+  width: 100%;
+  min-width: 100px;
 }
 .add-control {
   color: white;
@@ -102,8 +104,18 @@ button:focus {
 }
 .del-item {
   margin-right: 20px;
-  margin-left: 10px;
+  margin-left: auto;
   text-decoration: none !important;
+  font-size: 1rem;
+}
+
+#tooltip {
+  background: #293241;
+  color: white;
+  padding: 0.5em;
+  border-radius: 4px;
+  position: fixed;
+  display: none;
 }
 .edit-item {
   visibility: none;
