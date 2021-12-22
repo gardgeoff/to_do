@@ -3,7 +3,8 @@ const {
   BrowserWindow,
   Menu,
   ipcMain,
-  globalShortcut
+  globalShortcut,
+  dialog
 } = require("electron");
 const {
   Document,
@@ -22,21 +23,115 @@ const excelJs = require("exceljs");
 const workbook = new excelJs.Workbook();
 const worksheet = workbook.addWorksheet("to_do");
 let to_do;
-let arr = [];
-function readTextFile() {
-  const read = fs.readFileSync("to_do.txt", "utf-8");
-  console.log(read);
+// Guy Thomas SO answer
+function uniqueid() {
+  // always start with a letter (for DOM friendlyness)
+  var idstr = String.fromCharCode(Math.floor(Math.random() * 25 + 65));
+  do {
+    // between numbers and characters (48 is 0 and 90 is Z (42-48 = 90)
+    var ascicode = Math.floor(Math.random() * 42 + 48);
+    if (ascicode < 58 || ascicode > 64) {
+      // exclude all chars between : (58) and @ (64)
+      idstr += String.fromCharCode(ascicode);
+    }
+  } while (idstr.length < 32);
+
+  return idstr;
+}
+function saveToJson(data) {
+  fs.writeFile("./to_do.json", JSON.stringify(data), (err) => {
+    if (err) throw err;
+    rebuildScene();
+  });
+}
+function saveToTxt(data) {
+  let tempString = ``;
+  data.map((item) => {
+    let prio = item.priority ? `(${item.priority}) ` : "";
+    let due = item.due ? `due:${item.due}` : "";
+    let poc = item.poc ? `poc:${item.poc}` : "";
+    let sprint = item.sprint ? `sprint:${item.sprint}` : "";
+    let line =
+      `${prio}${item.date || ""} ${item.text || ""} ${
+        item.project || ""
+      } ${due} ${poc} ${sprint} \r\n` || "";
+    if (item.checked) {
+      line = "x " + line;
+    }
+    tempString += line;
+  });
+  fs.writeFile("./to_do.txt", tempString, function (err) {});
+}
+function rebuildScene() {
+  let rawdata = fs.readFileSync("to_do.json");
+  to_do = JSON.parse(rawdata);
+  win.webContents.send("loadedData", to_do);
+}
+function readTxtFile(directory) {
+  let arr = [];
+  const read = fs.readFileSync(directory, "utf-8");
   read.split(/\r?\n/).forEach((line) => {
     arr.push(parser.relaxed(line));
   });
-  console.log(arr);
+  let toJsonArr = [];
+  arr.map((entry) => {
+    let listItem = entry[0];
+    console.log(listItem);
+    let priority = listItem.priority;
+    let project = listItem.projects[0];
+    let context = listItem.contexts[0];
+    let poc = listItem.metadata.poc;
+    let sprint = listItem.metadata.sprint;
+    let due = listItem.metadata.due;
+    let text = listItem.text;
+    if (text.includes("+")) {
+      text = text.substring(0, text.indexOf("+"));
+    }
+    if (text.includes("@")) {
+      text = text.substring(0, text.indexOf("@"));
+    } else if (text.includes("due:")) {
+      text = text.substring(0, text.indexOf("due:"));
+    } else if (text.includes("sprint:")) {
+      text = text.substring(0, text.indexOf("sprint:"));
+    } else if (text.includes("poc:")) {
+      text = text.substring(0, text.indexOf("poc:"));
+    } else {
+      text = text;
+    }
+    text = text.trim();
+    let raw = listItem.raw;
+    let created = uniqueid();
+    let date = listItem.dateCreated
+      ? listItem.dateCreated.substring(0, 10)
+      : "";
+    let completed = listItem.completed;
+    let complete = listItem.complete ? "x" : "";
+    if (text) {
+      let jsonObj = {
+        priority,
+        context,
+        project,
+        text,
+        date,
+        raw,
+        sprint,
+        poc,
+        due,
+        created,
+        completed,
+        complete
+      };
+      toJsonArr.push(jsonObj);
+    }
+  });
+  to_do = toJsonArr;
+  saveToJson(to_do);
 }
-readTextFile();
 
-fs.writeFile("./to_do.json", "[]", { flag: "wx" }, function (err) {
-  let rawdata = fs.readFileSync("to_do.json");
-  to_do = JSON.parse(rawdata);
-});
+// fs.writeFile("./to_do.json", "[]", { flag: "wx" }, function (err) {
+//   let rawdata = fs.readFileSync("to_do.json");
+//   to_do = JSON.parse(rawdata);
+// });
 worksheet.columns = [
   { header: "task", key: "text", width: 30 },
   { header: "complete", key: "checked", width: 10 },
@@ -59,21 +154,57 @@ function writeXl() {
     worksheet.addRow(item);
   });
   try {
-    const data = workbook.xlsx.writeFile(`./to_do.xlsx`).then(() => {
-      console.log("success");
-    });
-  } catch (err) {
-    console.log("error");
-  }
+    const data = workbook.xlsx.writeFile(`./to_do.xlsx`).then(() => {});
+  } catch (err) {}
 }
 function writeWord() {}
-function writeTxt() {}
+function writeTxt() {
+  let options = {
+    title: "Save .TXT",
+    defaultPath: "./",
+    buttonLabel: "save"
+  };
+}
+function newFile() {}
+
+function openFile() {
+  let options = {
+    title: "select",
+    defaultPath: "./",
+    buttonLabel: "open",
+    filters: [{ name: "Text Files", extensions: ["txt"] }],
+    properties: ["openFile"]
+  };
+  dialog.showOpenDialog(win, options).then(function (res) {
+    let dir = res.filePaths[0];
+    readTxtFile(dir);
+  });
+}
 async function createWindow() {
   Menu.setApplicationMenu(
     Menu.buildFromTemplate([
       {
         label: "file",
         submenu: [
+          {
+            label: "save",
+            click() {
+              saveToTxt(to_do);
+              saveToJson(to_do);
+            }
+          },
+          {
+            label: "new",
+            click() {
+              newFile();
+            }
+          },
+          {
+            label: "open",
+            click() {
+              openFile();
+            }
+          },
           {
             label: "export",
             submenu: [
@@ -134,30 +265,12 @@ async function createWindow() {
 app.whenReady().then(() => {
   createWindow();
   ipcMain.on("load", (e, args) => {
-    let rawdata = fs.readFileSync("to_do.json");
-    to_do = JSON.parse(rawdata);
-    win.webContents.send("loadedData", to_do);
+    rebuildScene();
   });
   ipcMain.on("saveFile", (e, args) => {
     let tempObj = args.data;
-    fs.writeFile("./to_do.json", JSON.stringify(tempObj), (err) => {
-      if (err) throw err;
-    });
-    let tempString = ``;
-    tempObj.map((item) => {
-      let prio = item.priority ? `(${item.priority}) ` : "";
-      let line =
-        `${prio}${item.date || ""} ${item.text || ""} ${item.project || ""} ${
-          item.context || ""
-        } ${item.due || ""} \r\n` || "";
-      if (item.checked) {
-        line = "x " + line;
-      }
-      tempString += line;
-    });
-    fs.writeFile("./to_do.txt", tempString, function (err) {
-      if (err) console.log(err);
-    });
+    saveToJson(tempObj);
+    saveToTxt(tempObj);
   });
   globalShortcut.register("f5", () => {
     win.reload();
