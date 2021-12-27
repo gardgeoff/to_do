@@ -10,13 +10,13 @@ window.addEventListener("DOMContentLoaded", () => {
 });
 contextBridge.exposeInMainWorld("api", {
   send: (channel, data) => {
-    let validChannels = ["saveFile", "load"];
+    let validChannels = ["saveFile", "load", "toParse"];
     if (validChannels.includes(channel)) {
       ipcRenderer.send(channel, data);
     }
   },
   receive: (channel, func) => {
-    let validChannels = ["loadedData"];
+    let validChannels = ["loadedData", "parsed"];
     if (validChannels.includes(channel)) {
       ipcRenderer.on(channel, (event, ...args) => func(...args));
     }

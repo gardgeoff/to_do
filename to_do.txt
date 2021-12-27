@@ -1,3 +1,2 @@
-(A) 2021-12-22 test proj  poc:poc  
-(A) 2021-12-22 test prok  poc:poc sprint:spring 
-(A) 2021-12-22 test +tag due:2021-12-30 poc:tag sprint:tag 
+(A)  test     
+(B)  test     

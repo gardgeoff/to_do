@@ -1,6 +1,7 @@
 $(function () {
   // initialize empty array to hold "to do list" data
   let mainArr = [];
+  let selected;
   // send signal to main and retrieve the locally saved data
   // assign data to mainArr array and rebuild() to generate the screen
   window.api.send("load", true);
@@ -28,13 +29,13 @@ $(function () {
     $(".list-container").empty();
     let banners = [];
     let listItems = [];
-    console.log(listItems);
-    console.log(banners);
     mainArr.map((item) => {
       if (item.priority && item.priority.length) {
         !banners.includes(item.priority)
           ? banners.push(`${item.priority}`)
           : null;
+      } else if (!item.priority) {
+        !banners.includes("no_priority") ? banners.push("no_priority") : null;
       }
       listItems.push(item);
     });
@@ -52,59 +53,57 @@ $(function () {
         ? -1
         : 0;
     });
-    console.log(listItems);
-    console.log(banners);
+
     // makeSortable() causes lists to be drag and drop
     makeSortable();
     listItems.map((item) => {
-      // handle empty strings
-      let handleDue = !item.due ? "" : `due:${item.due}`;
-      let handlePoc = !item.poc ? "" : `poc:${item.poc}`;
-      let handleSprint = !item.sprint ? "" : `sprint:${item.sprint}`;
-      let handleContext = !item.context
-        ? undefined
-        : !item.context.includes("@")
-        ? "@" + item.context
-        : item.context;
-      let handleProject = !item.project
-        ? undefined
-        : !item.project.includes("+")
-        ? "+" + item.project
-        : item.project;
-      let handlePrio = !item.priority ? undefined : "(" + item.priority + ")";
-      let hasPrio = !item.priority
-        ? "group-no_priority"
-        : "group-" + item.priority;
-      let totalString = `${handlePrio || ""} ${item.date} ${item.text} ${
-        handleProject || ""
-      } ${handleContext || ""} ${handleDue} ${handlePoc} ${handleSprint}`;
-      $(".list-container").append(
-        `<div
-          uid=${item.created} 
-          class="list-item ${hasPrio}")
-          key=${item.priority}
-          text='${item.text}'
-          due=${item.due || ""}
-        >
-          <input connected="${item.created}" class="check" type="checkbox"/>
-          <span class="line-through">${totalString}</span>
-          <button class="del-item btn btn-danger">delete</button>
-        </div>`
-      );
-      $(".del-item").css("visibility", "hidden");
-      if (item.checked) {
-        $(`input[connected="${item.created}"]`)
-          .prop("checked", true)
-          .closest(".list-item")
-          .find(".line-through")
-          .css("textDecoration", "line-through");
+      let raw = item.raw;
+      let prio = item.priority;
+      let created = item.created;
+      let text = item.text;
+      let projects = item.projects.join(" +");
+      projects == "" ? null : (projects = "+" + projects);
+      let contexts = item.contexts.join(" @");
+      contexts == "" ? null : (contexts = "@" + contexts);
+      let metaArr = [];
+      for (var key in item.metadata) {
+        if (item.metadata.hasOwnProperty(key)) {
+          if (key != "uid") {
+            console.log("WHY ARE YOU PUSHING");
+            metaArr.push(key + ":" + item.metadata[key]);
+          }
+        }
       }
+      let metaString = metaArr.join(",");
+
+      let baseDiv = `
+      <div
+        raw="${raw}"
+        class=
+        "list-item ${prio}"
+        uid="${raw}"
+        text="${text}"
+        >
+          <span class="raw-text line-through">${
+            prio ? prio : ""
+          } ${created} ${text} ${projects} ${contexts} ${metaString} </span>
+      </div>`;
+
+      $(".list-container").append(baseDiv);
     });
 
-    !banners.includes("no_priority") ? banners.push("no_priority") : null;
+    !banners.includes("null") ? banners.push("null") : null;
     banners.map((item) => {
-      let insert = $(".group-" + item).first();
-      let string = `<div class="banner banner-${item}">${item}</div>`;
+      let insert;
+      let string;
+      if (item != "null") {
+        insert = $("." + item).first();
+        string = `<div class="banner banner-${item}">${item}</div>`;
+      } else {
+        insert = $(".null").first();
+        string = `<div class="banner banner-${item}">No Priority</div>`;
+      }
+
       $(string).insertBefore(insert);
     });
     checkDates();
@@ -115,7 +114,7 @@ $(function () {
       let now = moment(Date.now()).format("YYYY/MM/DD");
       let diffInDays = moment(dueDate).diff(now, "days");
       if (diffInDays <= 1) {
-        $(this).css({ color: "red" });
+        // $(this).css({ color: "red" });
       }
     });
   }
@@ -162,23 +161,40 @@ $(function () {
       $("input").val("");
     }
   }
+  function addNewLine(obj) {
+    let date = moment(Date.now()).format("YYYY-MM-DD");
+    let text = obj.text.trim();
+    let { priority, projects, contexts, complete, metadata, raw } = obj;
+    mainArr.push({
+      created: date,
+      text,
+      complete,
+      priority,
+      projects,
+      contexts,
+      metadata,
+      raw
+    });
+
+    rebuild();
+  }
   function makeSortable() {
     $(".sortable")
       .sortable({
         containment: "parent",
         cancel: ".banner",
         stop: function (event, ui) {
-          let uid = $(ui.item).attr("uid");
+          console.log("stopping");
+          let uid = $(ui.item).attr("raw");
           let newPrio = $(ui.item).prevAll(".banner:first").text();
-          console.log(newPrio);
-          newPrio == "no_priority"
-            ? (newPrio = undefined)
-            : (newPrio = newPrio);
+
+          newPrio == "No Priority" ? (newPrio = null) : (newPrio = newPrio);
           for (let i = 0; i < mainArr.length; i++) {
-            if (mainArr[i].created == uid) {
+            if (mainArr[i].raw == uid) {
               mainArr[i].priority = newPrio;
             }
           }
+
           rebuild();
         },
         update: function () {
@@ -186,14 +202,15 @@ $(function () {
           $(".sortable")
             .children()
             .each(function (i) {
-              let connection = $(this).attr("uid");
+              let raw = $(this).attr("raw");
               mainArr.map((item) => {
-                if (item.created == connection) {
+                console.log(item.raw);
+                if (item.raw == raw) {
                   tempItems.push(item);
                 }
               });
             });
-          console.log(tempItems);
+
           updateSortOrderJS(tempItems);
         }
       })
@@ -203,16 +220,25 @@ $(function () {
     mainArr = param;
   }
   // click event binders
-  $("#priority, #todotext, #project, #context, #sprint, #poc").on(
-    "keydown",
-    function (e) {
-      if (e.key === "Enter") {
-        addNew();
-      }
+  // $("#priority, #todotext, #project, #context, #sprint, #poc").on(
+  //   "keydown",
+  //   function (e) {
+  //     if (e.key === "Enter") {
+  //       addNew();
+  //     }
+  //   }
+  // );
+  $("#todotext").on("keydown", function (e) {
+    if (e.key === "Enter") {
+      let uid = uniqueid();
+      let phrase = $(this).val() + ` uid:${uid}`;
+      console.log(phrase);
+      window.api.send("toParse", { data: phrase });
     }
-  );
-  $("#submit").on("click", function () {
-    addNew();
+  });
+  window.api.receive("parsed", function (data) {
+    addNewLine(data[0]);
+    $("#todotext").val("");
   });
   $(document).on("click", ".check", function () {
     let isChecked = $(this).is(":checked");
@@ -266,21 +292,27 @@ $(function () {
       }
     });
   });
-  $(document).on("click", ".list-item", function (e) {
+
+  $(document).on("mouseup", ".list-item", function (e) {
     if (this === e.target) {
       let xPos = e.pageX;
       let yPos = e.pageY;
-      let text = $(this).attr("text");
-      navigator.clipboard.writeText(text);
-      $("#tooltip").css({
-        top: yPos,
-        left: xPos
-      });
-      $("#tooltip").fadeIn("fast", function () {
-        setTimeout(() => {
-          $("#tooltip").fadeOut("fast");
-        }, 500);
-      });
+      if (e.which == 3) {
+        let text = $(this).attr("text");
+        console.log(text);
+        navigator.clipboard.writeText(text);
+        $("#tooltip").css({
+          top: yPos,
+          left: xPos
+        });
+        $("#tooltip").fadeIn("fast", function () {
+          setTimeout(() => {
+            $("#tooltip").fadeOut("fast");
+          }, 500);
+        });
+      } else if (e.which == 1) {
+        selected = $(this).attr("uid");
+      }
     }
   });
   $(document).on("click", ".del-item", function () {
