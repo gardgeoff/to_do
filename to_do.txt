@@ -1,2 +1,11 @@
-(A)  test     
-(B)  test     
+(B) more tests because something always breaks +project @context due:thursday why:because_I_said_so 
+(A) test +projetB +projecB
+(A) test 4 
+this is task two, it has a little bit more text (64 characters)
+this task has a long description so that we can see how tasks with a really long description looks when the user interface is resized (expanded or condensed) to fit on the screen, really long descriptions must mean the task is complicated (255 characters)
+2020-01-08 test task, predate +projectA age:50
+this is a new task due:2021-12-21
+test3 
+test4 
+test 
+x 2021-12-20 2021-01-10 this is task one (32 characters) teat

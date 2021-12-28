@@ -7,6 +7,7 @@ $(function () {
   window.api.send("load", true);
   window.api.receive("loadedData", function (data) {
     mainArr = data;
+    console.log(mainArr);
     rebuild();
   });
   // Guy Thomas SO answer to unique id
@@ -39,17 +40,17 @@ $(function () {
       }
       listItems.push(item);
     });
-    listItems.sort((x, y) => {
-      return x.checked - y.checked;
-    });
     // sort priority alphabetically
     // sort no priority last
+    listItems.sort((x, y) => {
+      return x.complete - y.complete;
+    });
     listItems.sort((x, y) => {
       return x.priority < y.priority
         ? -1
         : x.priority > y.priority
         ? 1
-        : !y.priority
+        : !y.priority && x.priority
         ? -1
         : 0;
     });
@@ -57,10 +58,12 @@ $(function () {
     // makeSortable() causes lists to be drag and drop
     makeSortable();
     listItems.map((item) => {
+      console.log(item);
       let raw = item.raw;
       let prio = item.priority;
-      let created = item.created;
+      let dateCreated = item.dateCreated || "";
       let text = item.text;
+      let uid = item.metadata.uid;
       let projects = item.projects.join(" +");
       projects == "" ? null : (projects = "+" + projects);
       let contexts = item.contexts.join(" @");
@@ -69,41 +72,48 @@ $(function () {
       for (var key in item.metadata) {
         if (item.metadata.hasOwnProperty(key)) {
           if (key != "uid") {
-            console.log("WHY ARE YOU PUSHING");
             metaArr.push(key + ":" + item.metadata[key]);
           }
         }
       }
-      let metaString = metaArr.join(",");
+      let metaString = metaArr.join(" ");
 
       let baseDiv = `
       <div
         raw="${raw}"
         class=
         "list-item ${prio}"
-        uid="${raw}"
+        uid="${uid}"
         text="${text}"
         >
+          <input type=checkbox class="check" connected="${uid}"/>
           <span class="raw-text line-through">${
-            prio ? prio : ""
-          } ${created} ${text} ${projects} ${contexts} ${metaString} </span>
+            prio ? `(${prio})` : ""
+          } ${dateCreated} ${text} ${projects} ${contexts} ${metaString} </span>
+          <button class="del-item btn btn-danger">delete</button>
       </div>`;
 
       $(".list-container").append(baseDiv);
+
+      if (item.complete) {
+        $(`input[connected=${uid}]`).prop("checked", true).siblings().css({
+          textDecoration: "line-through"
+        });
+      }
     });
 
     !banners.includes("null") ? banners.push("null") : null;
     banners.map((item) => {
       let insert;
       let string;
-      if (item != "null") {
+
+      if (item != "null" && item != "complete") {
         insert = $("." + item).first();
         string = `<div class="banner banner-${item}">${item}</div>`;
       } else {
         insert = $(".null").first();
-        string = `<div class="banner banner-${item}">No Priority</div>`;
+        string = `<div class="banner banner-${item}">no priority</div>`;
       }
-
       $(string).insertBefore(insert);
     });
     checkDates();
@@ -166,7 +176,7 @@ $(function () {
     let text = obj.text.trim();
     let { priority, projects, contexts, complete, metadata, raw } = obj;
     mainArr.push({
-      created: date,
+      dateCreated: date,
       text,
       complete,
       priority,
@@ -187,14 +197,12 @@ $(function () {
           console.log("stopping");
           let uid = $(ui.item).attr("raw");
           let newPrio = $(ui.item).prevAll(".banner:first").text();
-
-          newPrio == "No Priority" ? (newPrio = null) : (newPrio = newPrio);
+          newPrio == "no priority" ? (newPrio = null) : (newPrio = newPrio);
           for (let i = 0; i < mainArr.length; i++) {
             if (mainArr[i].raw == uid) {
               mainArr[i].priority = newPrio;
             }
           }
-
           rebuild();
         },
         update: function () {
@@ -219,6 +227,22 @@ $(function () {
   function updateSortOrderJS(param) {
     mainArr = param;
   }
+  function editItem() {
+    if (selected) {
+      let index = mainArr.find((e) => {
+        return e.metadata.uid == selected;
+      });
+      let text = index.raw;
+      if (text.includes("uid:")) {
+        text = text.substring(0, text.indexOf("uid:"));
+      }
+      $("#todotext").val(text);
+      mainArr = mainArr.filter((item) => {
+        return item.metadata.uid != selected;
+      });
+      rebuild();
+    }
+  }
   // click event binders
   // $("#priority, #todotext, #project, #context, #sprint, #poc").on(
   //   "keydown",
@@ -241,40 +265,38 @@ $(function () {
     $("#todotext").val("");
   });
   $(document).on("click", ".check", function () {
+    console.log(mainArr);
     let isChecked = $(this).is(":checked");
     if (isChecked) {
-      $(this).closest(".list-item").find(".line-through").css({
-        textDecoration: "line-through"
-      });
       let connected = $(this).attr("connected");
       for (let i = 0; i < mainArr.length; i++) {
-        if (mainArr[i].created == connected) {
-          mainArr[i].checked = true;
+        if (mainArr[i].metadata.uid == connected) {
+          mainArr[i].complete = true;
           rebuild();
         }
       }
     } else {
-      $(this).closest(".list-item").find(".line-through").css({
-        textDecoration: "none"
-      });
       $(this).closest("div").attr("checked", "false");
       let connected = $(this).attr("connected");
       for (let i = 0; i < mainArr.length; i++) {
-        if (mainArr[i].created == connected) {
-          mainArr[i].checked = false;
+        if (mainArr[i].metadata.uid == connected) {
+          mainArr[i].complete = false;
           rebuild();
         }
       }
     }
-    window.api.send("saveFile", { data: mainArr });
+    // window.api.send("saveFile", { data: mainArr });
   });
   let keys = {};
   $(document).on("keydown", function (e) {
-    if (e.keyCode === 17 || e.which === 83) {
-      keys[e.which] = true;
-    }
+    keys[e.which] = true;
+
+    // ctrl + s to save
     if (keys[17] && keys[83]) {
       window.api.send("saveFile", { data: mainArr });
+    }
+    if (keys[17] && keys[69]) {
+      editItem();
     }
   });
   $(document).keyup(function (e) {
@@ -311,15 +333,22 @@ $(function () {
           }, 500);
         });
       } else if (e.which == 1) {
-        selected = $(this).attr("uid");
+        let id = $(this).attr("uid");
+        $(".list-item").css("outline", "none");
+        $(this).css({
+          outline: "2px solid #293241"
+        });
+        selected = id;
       }
     }
   });
   $(document).on("click", ".del-item", function () {
     let uid = $(this).closest(".list-item").attr("uid");
+    console.log(uid);
+    console.log($(this).closest(".list-item"));
     $(this).closest(".list-item").hide();
     mainArr = mainArr.filter((item) => {
-      return item.created != uid;
+      return item.metadata.uid != uid;
     });
     rebuild();
   });

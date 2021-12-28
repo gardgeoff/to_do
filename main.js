@@ -23,19 +23,7 @@ const parser = require("todotxt-parser");
 const fs = require("fs");
 const path = require("path");
 const excelJs = require("exceljs");
-const workbook = new excelJs.Workbook();
-const worksheet = workbook.addWorksheet("to_do");
-worksheet.columns = [
-  { header: "task", key: "text", width: 30 },
-  { header: "complete", key: "checked", width: 10 },
-  { header: "created", key: "date", width: 10 },
-  { header: "due", key: "due", width: 10 },
-  { header: "priority", key: "priority", width: 10 },
-  { header: "project", key: "project", width: 10 },
-  { header: "context", key: "context", width: 10 },
-  { header: "sprint", key: "sprint", width: 10 },
-  { header: "poc", key: "poc", width: 10 }
-];
+
 let to_do;
 // Guy Thomas SO answer for unique id
 function uniqueid() {
@@ -58,23 +46,20 @@ function saveToJson(data) {
     rebuildScene();
   });
 }
-function saveToTxt(data) {
+function saveToTxt(data, directory) {
+  console.log(data);
   let tempString = ``;
   data.map((item) => {
-    let prio = item.priority ? `(${item.priority}) ` : "";
-    let due = item.due ? `due:${item.due}` : "";
-    let poc = item.poc ? `poc:${item.poc}` : "";
-    let sprint = item.sprint ? `sprint:${item.sprint}` : "";
-    let line =
-      `${prio}${item.date || ""} ${item.text || ""} ${
-        item.project || ""
-      } ${due} ${poc} ${sprint} \r\n` || "";
-    if (item.checked) {
-      line = "x " + line;
-    }
+    let line = item.raw;
+
+    line = line.includes("uid:")
+      ? line.substring(0, line.indexOf("uid:"))
+      : line;
+    line = line + "\r\n";
     tempString += line;
   });
-  fs.writeFile("./to_do.txt", tempString, function (err) {});
+
+  fs.writeFile(directory, tempString, function (err) {});
 }
 function rebuildScene() {
   let rawdata = fs.readFileSync("to_do.json");
@@ -94,6 +79,7 @@ function stripText(string) {
     text = text.substring(0, text.indexOf("sprint:"));
   } else if (text.includes("poc:")) {
     text = text.substring(0, text.indexOf("poc:"));
+    // tests for any other meta data strings using the format foo:bar
   } else if (/\w+:\w/gm.test(text)) {
     text = text.substring(0, text.indexOf(text.match(/\w+:\w/gm)[0]));
   } else {
@@ -107,44 +93,19 @@ function readTxtFile(directory) {
   read.split(/\r?\n/).forEach((line) => {
     arr.push(parser.relaxed(line));
   });
-  let toJsonArr = [];
-  arr.map((entry) => {
-    let listItem = entry[0];
-    let priority = listItem.priority;
-    let project = listItem.projects[0];
-    let context = listItem.contexts[0];
-    let poc = listItem.metadata.poc;
-    let sprint = listItem.metadata.sprint;
-    let due = listItem.metadata.due;
-    let text = stripText(listItem.text);
 
-    text = text.trim();
-    let raw = listItem.raw;
-    let created = uniqueid();
-    let date = listItem.dateCreated
-      ? listItem.dateCreated.substring(0, 10)
-      : "";
-    let completed = listItem.completed;
-    let complete = listItem.complete ? "x" : "";
-    if (text) {
-      let jsonObj = {
-        priority,
-        context,
-        project,
-        text,
-        date,
-        raw,
-        sprint,
-        poc,
-        due,
-        created,
-        completed,
-        complete
-      };
-      toJsonArr.push(jsonObj);
+  let newA = [];
+  arr.map((item) => {
+    console.log(item[0].dateCreated);
+    item[0].metadata.uid = uniqueid();
+    item[0].dateCreated =
+      item[0].dateCreated != null ? item[0].dateCreated.substring(0, 10) : null;
+    item[0].text = stripText(item[0].text);
+    if (item[0].text.length > 0) {
+      newA.push(item[0]);
     }
   });
-  to_do = toJsonArr;
+  to_do = newA;
   saveToJson(to_do);
 }
 
@@ -156,135 +117,72 @@ function increasePrio() {}
 function decreasePrio() {}
 function updateTask() {}
 function writeXl() {
-  to_do.forEach((item) => {
-    if (item.checked) {
-      item.checked = "x";
-    } else {
-      item.checked = "";
-    }
-    worksheet.addRow(item);
+  let filepath;
+  let options = {
+    title: "Save",
+    defaultPath: "./",
+    buttonLabel: "save",
+    filters: [{ name: "Excel", extensions: [".xlsx"] }]
+  };
+  dialog.showSaveDialog(win, options).then(function (res) {
+    filepath = res.filePath;
+
+    const workbook = new excelJs.Workbook();
+    const worksheet = workbook.addWorksheet("to_do");
+    worksheet.columns = [
+      { header: "task", key: "text", width: 30 },
+      { header: "complete", key: "complete", width: 10 },
+      { header: "created", key: "dateCreated", width: 10 },
+      { header: "due", key: "due", width: 10 },
+      { header: "priority", key: "priority", width: 10 },
+      { header: "project", key: "projects", width: 10 },
+      { header: "context", key: "contexts", width: 10 },
+      { header: "sprint", key: "sprint", width: 10 },
+      { header: "poc", key: "poc", width: 10 }
+    ];
+
+    let tempArr = to_do;
+    tempArr.forEach((item) => {
+      let projects = item.projects;
+      let contexts = item.contexts;
+      item.projects = Array.isArray(projects) ? projects.join(", ") : projects;
+      item.contexts = Array.isArray(contexts) ? contexts.join(", ") : "";
+      item.complete = item.complete ? "x" : "";
+      item.metadata.sprint ? (item.sprint = item.metadata.sprint) : null;
+      item.metadata.poc ? (item.poc = item.metadata.poc) : null;
+      item.metadata.due ? (item.due = item.metadata.due) : null;
+
+      worksheet.addRow(item);
+    });
+    try {
+      const data = workbook.xlsx.writeFile(filepath).then(() => {});
+    } catch (err) {}
   });
-  try {
-    const data = workbook.xlsx.writeFile(`./to_do.xlsx`).then(() => {});
-  } catch (err) {}
 }
 function writeWord() {
-  const borders = {
-    top: { style: BorderStyle.NONE, size: 0, color: "FFFFFF" },
-    bottom: { style: BorderStyle.NONE, size: 0, color: "FFFFFF" },
-    left: { style: BorderStyle.NONE, size: 0, color: "FFFFFF" },
-    right: { style: BorderStyle.NONE, size: 0, color: "FFFFFF" }
+  let filePath;
+  let options = {
+    title: "Save",
+    defaultPath: "./",
+    buttonLabel: "save",
+    filters: [{ name: "Word Document", extensions: ["docx"] }]
   };
-  let margins = {
-    top: convertInchesToTwip(0.03),
-    bottom: convertInchesToTwip(0.03),
-    right: convertInchesToTwip(0.03),
-    left: convertInchesToTwip(0.03)
-  };
-  let totalRows = [
-    new TableRow({
-      children: [
-        new TableCell({
-          borders,
-          margins,
-          children: [
-            new Paragraph({
-              children: [
-                new TextRun({
-                  text: "Task",
-                  bold: true
-                })
-              ]
-            })
-          ],
-          width: {
-            size: convertInchesToTwip(3.5),
-            type: WidthType.DXA
-          }
-        }),
-        new TableCell({
-          borders,
-          margins,
-          children: [
-            new Paragraph({
-              children: [
-                new TextRun({
-                  text: "Created",
-                  bold: true
-                })
-              ]
-            })
-          ],
-          width: {
-            size: convertInchesToTwip(0.75),
-            type: WidthType.DXA
-          }
-        }),
-        new TableCell({
-          borders,
-          margins,
-          children: [
-            new Paragraph({
-              children: [
-                new TextRun({
-                  text: "Due",
-                  bold: true
-                })
-              ]
-            })
-          ],
-          width: {
-            size: convertInchesToTwip(0.75),
-            type: WidthType.DXA
-          }
-        }),
-        new TableCell({
-          borders,
-          margins,
-          children: [
-            new Paragraph({
-              children: [
-                new TextRun({
-                  text: "Done",
-                  bold: true
-                })
-              ]
-            })
-          ],
-          width: {
-            size: convertInchesToTwip(0.5),
-            type: WidthType.DXA
-          }
-        }),
-        new TableCell({
-          borders,
-          margins,
-          children: [
-            new Paragraph({
-              children: [
-                new TextRun({
-                  text: "Project",
-                  bold: true
-                })
-              ]
-            })
-          ],
-          width: {
-            size: convertInchesToTwip(1.0),
-            type: WidthType.DXA
-          }
-        })
-      ]
-    })
-  ];
-  to_do.map((item) => {
-    let task = item.text || "";
-    let created = item.date || "";
-    let due = item.due || "";
-    let done = item.checked ? "x" : "";
-    let project = item.project || "";
+  dialog.showSaveDialog(win, options).then(function (res) {
+    filePath = res.filePath;
 
-    totalRows.push(
+    const borders = {
+      top: { style: BorderStyle.NONE, size: 0, color: "FFFFFF" },
+      bottom: { style: BorderStyle.NONE, size: 0, color: "FFFFFF" },
+      left: { style: BorderStyle.NONE, size: 0, color: "FFFFFF" },
+      right: { style: BorderStyle.NONE, size: 0, color: "FFFFFF" }
+    };
+    let margins = {
+      top: convertInchesToTwip(0.03),
+      bottom: convertInchesToTwip(0.03),
+      right: convertInchesToTwip(0.03),
+      left: convertInchesToTwip(0.03)
+    };
+    let totalRows = [
       new TableRow({
         children: [
           new TableCell({
@@ -294,69 +192,178 @@ function writeWord() {
               new Paragraph({
                 children: [
                   new TextRun({
-                    text: task
+                    text: "Task",
+                    bold: true
                   })
                 ]
               })
-            ]
+            ],
+            width: {
+              size: convertInchesToTwip(3.5),
+              type: WidthType.DXA
+            }
           }),
           new TableCell({
             borders,
             margins,
-            children: [new Paragraph(created)]
+            children: [
+              new Paragraph({
+                children: [
+                  new TextRun({
+                    text: "Created",
+                    bold: true
+                  })
+                ]
+              })
+            ],
+            width: {
+              size: convertInchesToTwip(0.75),
+              type: WidthType.DXA
+            }
           }),
           new TableCell({
             borders,
             margins,
-            children: [new Paragraph(due)]
+            children: [
+              new Paragraph({
+                children: [
+                  new TextRun({
+                    text: "Due",
+                    bold: true
+                  })
+                ]
+              })
+            ],
+            width: {
+              size: convertInchesToTwip(0.75),
+              type: WidthType.DXA
+            }
           }),
           new TableCell({
             borders,
             margins,
-            children: [new Paragraph(done)]
+            children: [
+              new Paragraph({
+                children: [
+                  new TextRun({
+                    text: "Done",
+                    bold: true
+                  })
+                ]
+              })
+            ],
+            width: {
+              size: convertInchesToTwip(0.5),
+              type: WidthType.DXA
+            }
           }),
           new TableCell({
             borders,
             margins,
-            children: [new Paragraph(project)]
+            children: [
+              new Paragraph({
+                children: [
+                  new TextRun({
+                    text: "Project",
+                    bold: true
+                  })
+                ]
+              })
+            ],
+            width: {
+              size: convertInchesToTwip(1.0),
+              type: WidthType.DXA
+            }
           })
         ]
       })
-    );
-  });
-  const table = new Table({
-    rows: totalRows,
-    width: {
-      size: 100,
-      type: WidthType.PERCENTAGE
-    }
-  });
+    ];
+    to_do.map((item) => {
+      let task = item.text || "";
+      let dateCreated = item.dateCreated || "";
+      let due = item.due || "";
+      let done = item.complete ? "x" : "";
+      let project = item.projects.join(", ") || "";
 
-  const doc = new Document({
-    styles: {
-      paragraphStyles: [
-        {
-          name: "Normal",
-          run: {
-            size: 24,
-            font: "Calibri"
+      totalRows.push(
+        new TableRow({
+          children: [
+            new TableCell({
+              borders,
+              margins,
+              children: [
+                new Paragraph({
+                  children: [
+                    new TextRun({
+                      text: task
+                    })
+                  ]
+                })
+              ]
+            }),
+            new TableCell({
+              borders,
+              margins,
+              children: [new Paragraph(dateCreated)]
+            }),
+            new TableCell({
+              borders,
+              margins,
+              children: [new Paragraph(due)]
+            }),
+            new TableCell({
+              borders,
+              margins,
+              children: [new Paragraph(done)]
+            }),
+            new TableCell({
+              borders,
+              margins,
+              children: [new Paragraph(project)]
+            })
+          ]
+        })
+      );
+    });
+    const table = new Table({
+      rows: totalRows,
+      width: {
+        size: 100,
+        type: WidthType.PERCENTAGE
+      }
+    });
+
+    const doc = new Document({
+      styles: {
+        paragraphStyles: [
+          {
+            name: "Normal",
+            run: {
+              size: 24,
+              font: "Calibri"
+            }
           }
-        }
-      ]
-    },
-    sections: [{ children: [table] }]
-  });
-  Packer.toBuffer(doc).then((buffer) => {
-    fs.writeFileSync("My Document.docx", buffer);
+        ]
+      },
+      sections: [{ children: [table] }]
+    });
+    Packer.toBuffer(doc).then((buffer) => {
+      fs.writeFileSync(filePath, buffer);
+    });
   });
 }
 
 function writeTxt() {
   let options = {
-    title: "Save .TXT",
+    title: "Save",
     defaultPath: "./",
-    buttonLabel: "save"
+    buttonLabel: "save",
+    filters: [{ name: "Text Files", extensions: ["txt"] }]
   };
+  dialog.showSaveDialog(win, options).then(function (res) {
+    let filePath = res.filePath;
+    saveToTxt(to_do, filePath);
+  });
 }
 function newFile() {}
 
@@ -382,7 +389,7 @@ async function createWindow() {
           {
             label: "save",
             click() {
-              saveToTxt(to_do);
+              saveToTxt(to_do, "./to_do.txt");
               saveToJson(to_do);
             }
           },
@@ -469,7 +476,6 @@ app.whenReady().then(() => {
     rebuildScene();
   });
   ipcMain.on("toParse", (e, args) => {
-    console.log("parsed");
     let toDecipher = args.data;
     let returnObj = parser.relaxed(toDecipher);
     returnObj[0].text = stripText(returnObj[0].text);
@@ -479,7 +485,7 @@ app.whenReady().then(() => {
   ipcMain.on("saveFile", (e, args) => {
     let tempObj = args.data;
     saveToJson(tempObj);
-    saveToTxt(tempObj);
+    saveToTxt(tempObj, "./to_do.txt");
   });
   globalShortcut.register("f5", () => {
     win.reload();
