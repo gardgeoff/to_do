@@ -21,7 +21,6 @@ $(function () {
         idstr += String.fromCharCode(ascicode);
       }
     } while (idstr.length < 32);
-
     return idstr;
   }
   // main function to rebuild the scene whenever something changes
