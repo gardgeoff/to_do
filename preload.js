@@ -16,7 +16,7 @@ contextBridge.exposeInMainWorld("api", {
     }
   },
   receive: (channel, func) => {
-    let validChannels = ["loadedData", "parsed"];
+    let validChannels = ["loadedData", "parsed", "edit"];
     if (validChannels.includes(channel)) {
       ipcRenderer.on(channel, (event, ...args) => func(...args));
     }

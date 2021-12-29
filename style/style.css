@@ -47,6 +47,22 @@ button:focus {
   padding: 10px;
   width: 100%;
   background: #293241;
+  position: fixed;
+}
+#invisibox {
+  width: 100%;
+  padding: 10px;
+  visibility: hidden;
+}
+#invisibox-bottom {
+  height: 100px;
+  width: 100%;
+  visibility: hidden;
+}
+invisibox > input {
+  background: none;
+  border: none;
+  height: 46px;
 }
 #search > input {
   width: 100%;
@@ -91,11 +107,14 @@ button:focus {
 .check {
   margin-right: 20px;
 }
+input[type="checkbox"] {
+}
 .list-item {
   border-bottom: 0.5px solid rgba(0, 0, 0, 0.473);
   font-size: 1rem;
   padding: 10px;
   padding-left: 50px;
+  word-break: break-all;
   display: flex;
   align-items: center;
 }

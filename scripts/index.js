@@ -7,7 +7,6 @@ $(function () {
   window.api.send("load", true);
   window.api.receive("loadedData", function (data) {
     mainArr = data;
-    console.log(mainArr);
     rebuild();
   });
   // Guy Thomas SO answer to unique id
@@ -58,7 +57,6 @@ $(function () {
     // makeSortable() causes lists to be drag and drop
     makeSortable();
     listItems.map((item) => {
-      console.log(item);
       let raw = item.raw;
       let prio = item.priority;
       let dateCreated = item.dateCreated || "";
@@ -128,64 +126,8 @@ $(function () {
       }
     });
   }
-  // grab inputs and create a new to do item
-  function addNew() {
-    let priority = $("#priority").val().trim();
-    let todo = $("#todotext").val().trim();
-    let due = $("#due").val() == "" ? "" : `${$("#due").val()}`;
-    let sprint = $("#sprint").val().trim() || "";
-    let poc = $("#poc").val().trim() || "";
-    let project = $("#project").val().trim();
-    let context = $("#context").val().trim();
-    let created = Date.now();
-    let date = moment(Date.now()).format("YYYY-MM-DD");
-    let prioNoParenthesis;
-    // test if priority exists and is A-Z
-    if (priority && /^[a-zA-Z]+$/.test(priority)) {
-      let tempPrio = priority.match(/^[a-zA-Z]+$/)[0];
-      tempPrio = tempPrio.toUpperCase();
-      prioNoParenthesis = tempPrio;
-      tempPrio = "(" + tempPrio + ")";
-      priority = tempPrio;
-    }
-    if (project && !project.startsWith("+")) {
-      project = "+" + project;
-    }
-    if (context && !context.startsWith("@")) {
-      context = "@" + context;
-    }
-    if (todo) {
-      mainArr.push({
-        checked: false,
-        priority: prioNoParenthesis,
-        text: todo,
-        project,
-        context,
-        sprint,
-        poc,
-        created,
-        due,
-        date
-      });
-      rebuild();
-      $("input").val("");
-    }
-  }
   function addNewLine(obj) {
-    let date = moment(Date.now()).format("YYYY-MM-DD");
-    let text = obj.text.trim();
-    let { priority, projects, contexts, complete, metadata, raw } = obj;
-    mainArr.push({
-      dateCreated: date,
-      text,
-      complete,
-      priority,
-      projects,
-      contexts,
-      metadata,
-      raw
-    });
-
+    mainArr.push(obj);
     rebuild();
   }
   function makeSortable() {
@@ -194,7 +136,6 @@ $(function () {
         containment: "parent",
         cancel: ".banner",
         stop: function (event, ui) {
-          console.log("stopping");
           let uid = $(ui.item).attr("raw");
           let newPrio = $(ui.item).prevAll(".banner:first").text();
           newPrio == "no priority" ? (newPrio = null) : (newPrio = newPrio);
@@ -212,7 +153,6 @@ $(function () {
             .each(function (i) {
               let raw = $(this).attr("raw");
               mainArr.map((item) => {
-                console.log(item.raw);
                 if (item.raw == raw) {
                   tempItems.push(item);
                 }
@@ -227,45 +167,75 @@ $(function () {
   function updateSortOrderJS(param) {
     mainArr = param;
   }
-  function editItem() {
+  function nextChar(c) {
+    return c.toUpperCase() != "Z"
+      ? String.fromCharCode(c.charCodeAt(0) + 1)
+      : c;
+  }
+  function prevChar(c) {
+    return c.toUpperCase() != "A"
+      ? String.fromCharCode(c.charCodeAt(0) - 1)
+      : c;
+  }
+
+  function editItem(command) {
+    console.log("called", command);
     if (selected) {
-      let index = mainArr.find((e) => {
+      let item = mainArr.find((e) => {
         return e.metadata.uid == selected;
       });
-      let text = index.raw;
-      if (text.includes("uid:")) {
-        text = text.substring(0, text.indexOf("uid:"));
+      if (command === "alter text") {
+        console.log("called");
+        let text = item.raw;
+        if (text.includes("uid:")) {
+          text = text.substring(0, text.indexOf("uid:"));
+        }
+        $("#todotext").val(text);
+        mainArr = mainArr.filter((item) => {
+          return item.metadata.uid != selected;
+        });
+      } else if (command === "upPrio" || command === "downPrio") {
+        let priority = item.priority;
+        if (priority) {
+          let uid = item.metadata.uid;
+          mainArr.forEach((task) => {
+            if (task.metadata.uid === uid) {
+              command == "upPrio"
+                ? (task.priority = prevChar(priority))
+                : (task.priority = nextChar(priority));
+            }
+          });
+        }
+        console.log(mainArr);
       }
-      $("#todotext").val(text);
-      mainArr = mainArr.filter((item) => {
-        return item.metadata.uid != selected;
-      });
       rebuild();
+      selected = null;
     }
   }
-  // click event binders
-  // $("#priority, #todotext, #project, #context, #sprint, #poc").on(
-  //   "keydown",
-  //   function (e) {
-  //     if (e.key === "Enter") {
-  //       addNew();
-  //     }
-  //   }
-  // );
+
   $("#todotext").on("keydown", function (e) {
     if (e.key === "Enter") {
       let uid = uniqueid();
       let phrase = $(this).val() + ` uid:${uid}`;
-      console.log(phrase);
-      window.api.send("toParse", { data: phrase });
+      let isHtml = /<\/?[a-z][\s\S]*>/i.test(phrase);
+      let tags = /[<>]/gm.test(phrase);
+      if (isHtml) {
+        $("#todotext").val("");
+      } else {
+        window.api.send("toParse", { data: phrase });
+      }
     }
   });
   window.api.receive("parsed", function (data) {
     addNewLine(data[0]);
     $("#todotext").val("");
   });
+  window.api.receive("edit", function (data) {
+    let command = data.command;
+
+    editItem(command);
+  });
   $(document).on("click", ".check", function () {
-    console.log(mainArr);
     let isChecked = $(this).is(":checked");
     if (isChecked) {
       let connected = $(this).attr("connected");
@@ -295,9 +265,6 @@ $(function () {
     if (keys[17] && keys[83]) {
       window.api.send("saveFile", { data: mainArr });
     }
-    if (keys[17] && keys[69]) {
-      editItem();
-    }
   });
   $(document).keyup(function (e) {
     delete keys[e.which];
@@ -321,7 +288,6 @@ $(function () {
       let yPos = e.pageY;
       if (e.which == 3) {
         let text = $(this).attr("text");
-        console.log(text);
         navigator.clipboard.writeText(text);
         $("#tooltip").css({
           top: yPos,
@@ -344,8 +310,6 @@ $(function () {
   });
   $(document).on("click", ".del-item", function () {
     let uid = $(this).closest(".list-item").attr("uid");
-    console.log(uid);
-    console.log($(this).closest(".list-item"));
     $(this).closest(".list-item").hide();
     mainArr = mainArr.filter((item) => {
       return item.metadata.uid != uid;

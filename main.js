@@ -6,24 +6,11 @@ const {
   globalShortcut,
   dialog
 } = require("electron");
-const {
-  Document,
-  BorderStyle,
-  Packer,
-  Paragraph,
-  Table,
-  TableCell,
-  TableRow,
-  WidthType,
-  Tablerow,
-  convertInchesToTwip,
-  TextRun
-} = require("docx");
 const parser = require("todotxt-parser");
 const fs = require("fs");
 const path = require("path");
-const excelJs = require("exceljs");
-
+let word = require("./scripts/writeword");
+let excel = require("./scripts/writexl");
 let to_do;
 // Guy Thomas SO answer for unique id
 function uniqueid() {
@@ -46,12 +33,12 @@ function saveToJson(data) {
     rebuildScene();
   });
 }
+
 function saveToTxt(data, directory) {
-  console.log(data);
   let tempString = ``;
   data.map((item) => {
-    let line = item.raw;
-
+    let line =
+      item.complete && !item.raw.startsWith("x") ? "x " + item.raw : item.raw;
     line = line.includes("uid:")
       ? line.substring(0, line.indexOf("uid:"))
       : line;
@@ -96,7 +83,6 @@ function readTxtFile(directory) {
 
   let newA = [];
   arr.map((item) => {
-    console.log(item[0].dateCreated);
     item[0].metadata.uid = uniqueid();
     item[0].dateCreated =
       item[0].dateCreated != null ? item[0].dateCreated.substring(0, 10) : null;
@@ -108,249 +94,8 @@ function readTxtFile(directory) {
   to_do = newA;
   saveToJson(to_do);
 }
-
-// fs.writeFile("./to_do.json", "[]", { flag: "wx" }, function (err) {
-//   let rawdata = fs.readFileSync("to_do.json");
-//   to_do = JSON.parse(rawdata);
-// });
-function increasePrio() {}
-function decreasePrio() {}
-function updateTask() {}
-function writeXl() {
-  let filepath;
-  let options = {
-    title: "Save",
-    defaultPath: "./",
-    buttonLabel: "save",
-    filters: [{ name: "Excel", extensions: [".xlsx"] }]
-  };
-  dialog.showSaveDialog(win, options).then(function (res) {
-    filepath = res.filePath;
-
-    const workbook = new excelJs.Workbook();
-    const worksheet = workbook.addWorksheet("to_do");
-    worksheet.columns = [
-      { header: "task", key: "text", width: 30 },
-      { header: "complete", key: "complete", width: 10 },
-      { header: "created", key: "dateCreated", width: 10 },
-      { header: "due", key: "due", width: 10 },
-      { header: "priority", key: "priority", width: 10 },
-      { header: "project", key: "projects", width: 10 },
-      { header: "context", key: "contexts", width: 10 },
-      { header: "sprint", key: "sprint", width: 10 },
-      { header: "poc", key: "poc", width: 10 }
-    ];
-
-    let tempArr = to_do;
-    tempArr.forEach((item) => {
-      let projects = item.projects;
-      let contexts = item.contexts;
-      item.projects = Array.isArray(projects) ? projects.join(", ") : projects;
-      item.contexts = Array.isArray(contexts) ? contexts.join(", ") : "";
-      item.complete = item.complete ? "x" : "";
-      item.metadata.sprint ? (item.sprint = item.metadata.sprint) : null;
-      item.metadata.poc ? (item.poc = item.metadata.poc) : null;
-      item.metadata.due ? (item.due = item.metadata.due) : null;
-
-      worksheet.addRow(item);
-    });
-    try {
-      const data = workbook.xlsx.writeFile(filepath).then(() => {});
-    } catch (err) {}
-  });
-}
-function writeWord() {
-  let filePath;
-  let options = {
-    title: "Save",
-    defaultPath: "./",
-    buttonLabel: "save",
-    filters: [{ name: "Word Document", extensions: ["docx"] }]
-  };
-  dialog.showSaveDialog(win, options).then(function (res) {
-    filePath = res.filePath;
-
-    const borders = {
-      top: { style: BorderStyle.NONE, size: 0, color: "FFFFFF" },
-      bottom: { style: BorderStyle.NONE, size: 0, color: "FFFFFF" },
-      left: { style: BorderStyle.NONE, size: 0, color: "FFFFFF" },
-      right: { style: BorderStyle.NONE, size: 0, color: "FFFFFF" }
-    };
-    let margins = {
-      top: convertInchesToTwip(0.03),
-      bottom: convertInchesToTwip(0.03),
-      right: convertInchesToTwip(0.03),
-      left: convertInchesToTwip(0.03)
-    };
-    let totalRows = [
-      new TableRow({
-        children: [
-          new TableCell({
-            borders,
-            margins,
-            children: [
-              new Paragraph({
-                children: [
-                  new TextRun({
-                    text: "Task",
-                    bold: true
-                  })
-                ]
-              })
-            ],
-            width: {
-              size: convertInchesToTwip(3.5),
-              type: WidthType.DXA
-            }
-          }),
-          new TableCell({
-            borders,
-            margins,
-            children: [
-              new Paragraph({
-                children: [
-                  new TextRun({
-                    text: "Created",
-                    bold: true
-                  })
-                ]
-              })
-            ],
-            width: {
-              size: convertInchesToTwip(0.75),
-              type: WidthType.DXA
-            }
-          }),
-          new TableCell({
-            borders,
-            margins,
-            children: [
-              new Paragraph({
-                children: [
-                  new TextRun({
-                    text: "Due",
-                    bold: true
-                  })
-                ]
-              })
-            ],
-            width: {
-              size: convertInchesToTwip(0.75),
-              type: WidthType.DXA
-            }
-          }),
-          new TableCell({
-            borders,
-            margins,
-            children: [
-              new Paragraph({
-                children: [
-                  new TextRun({
-                    text: "Done",
-                    bold: true
-                  })
-                ]
-              })
-            ],
-            width: {
-              size: convertInchesToTwip(0.5),
-              type: WidthType.DXA
-            }
-          }),
-          new TableCell({
-            borders,
-            margins,
-            children: [
-              new Paragraph({
-                children: [
-                  new TextRun({
-                    text: "Project",
-                    bold: true
-                  })
-                ]
-              })
-            ],
-            width: {
-              size: convertInchesToTwip(1.0),
-              type: WidthType.DXA
-            }
-          })
-        ]
-      })
-    ];
-    to_do.map((item) => {
-      let task = item.text || "";
-      let dateCreated = item.dateCreated || "";
-      let due = item.due || "";
-      let done = item.complete ? "x" : "";
-      let project = item.projects.join(", ") || "";
-
-      totalRows.push(
-        new TableRow({
-          children: [
-            new TableCell({
-              borders,
-              margins,
-              children: [
-                new Paragraph({
-                  children: [
-                    new TextRun({
-                      text: task
-                    })
-                  ]
-                })
-              ]
-            }),
-            new TableCell({
-              borders,
-              margins,
-              children: [new Paragraph(dateCreated)]
-            }),
-            new TableCell({
-              borders,
-              margins,
-              children: [new Paragraph(due)]
-            }),
-            new TableCell({
-              borders,
-              margins,
-              children: [new Paragraph(done)]
-            }),
-            new TableCell({
-              borders,
-              margins,
-              children: [new Paragraph(project)]
-            })
-          ]
-        })
-      );
-    });
-    const table = new Table({
-      rows: totalRows,
-      width: {
-        size: 100,
-        type: WidthType.PERCENTAGE
-      }
-    });
-
-    const doc = new Document({
-      styles: {
-        paragraphStyles: [
-          {
-            name: "Normal",
-            run: {
-              size: 24,
-              font: "Calibri"
-            }
-          }
-        ]
-      },
-      sections: [{ children: [table] }]
-    });
-    Packer.toBuffer(doc).then((buffer) => {
-      fs.writeFileSync(filePath, buffer);
-    });
-  });
+function sendEdit(command) {
+  win.webContents.send("edit", { command });
 }
 
 function writeTxt() {
@@ -411,13 +156,13 @@ async function createWindow() {
               {
                 label: "excel",
                 click() {
-                  writeXl();
+                  excel.writeXl(to_do);
                 }
               },
               {
                 label: "word",
                 click() {
-                  writeWord();
+                  word.writeWord(to_do);
                 }
               },
               {
@@ -442,14 +187,30 @@ async function createWindow() {
           {
             label: "increase priority",
             click() {
-              increasePrio();
-            }
+              sendEdit("upPrio");
+            },
+            accelerator: "Ctrl+Up"
+          },
+          {
+            label: "decrease priority",
+            click() {
+              sendEdit("downPrio");
+            },
+            accelerator: "Ctrl+Down"
+          },
+          {
+            label: "alter text",
+            click() {
+              sendEdit("alter text");
+            },
+            accelerator: "Ctrl+E"
           },
           {
             label: "open dev tools",
             click() {
               win.openDevTools();
-            }
+            },
+            accelerator: "Ctrl+Shift+I"
           }
         ]
       }
