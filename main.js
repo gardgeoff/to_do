@@ -38,17 +38,24 @@ function saveToJson(data) {
 
 function saveToTxt(data, directory) {
   let tempString = ``;
-  data.map((item) => {
-    let line =
-      item.complete && !item.raw.startsWith("x") ? "x " + item.raw : item.raw;
-    line = line.includes("uid:")
-      ? line.substring(0, line.indexOf("uid:"))
-      : line;
-    line = line + "\r\n";
-    tempString += line;
-  });
+  if (typeof data == "object") {
+    // not empty file
+    data.map((item) => {
+      let line =
+        item.complete && !item.raw.startsWith("x") ? "x " + item.raw : item.raw;
+      line = line.includes("uid:")
+        ? line.substring(0, line.indexOf("uid:"))
+        : line;
+      line = line + "\r\n";
+      tempString += line;
+    });
+  }
 
-  fs.writeFile(directory, tempString, function (err) {});
+  fs.writeFile(directory, tempString, function (err) {
+    if (data == "") {
+      readTxtFile(directory);
+    }
+  });
 }
 function rebuildScene() {
   let rawdata = fs.readFileSync("to_do.json");
@@ -115,7 +122,18 @@ function writeTxt() {
     saveToTxt(to_do, filePath);
   });
 }
-function newFile() {}
+function newFile() {
+  let options = {
+    title: "New Txt File",
+    defaultPath: "./",
+    buttonLabel: "create",
+    filters: [{ name: "txt", extensions: ["txt"] }]
+  };
+  dialog.showSaveDialog(win, options).then(function (res) {
+    let filePath = res.filePath;
+    saveToTxt("", filePath);
+  });
+}
 
 function openFile() {
   let options = {
@@ -137,23 +155,34 @@ async function createWindow() {
         label: "File",
         submenu: [
           {
+            label: "New",
+            click() {
+              newFile();
+            },
+            accelerator: "Ctrl+N"
+          },
+          {
             label: "Save",
             click() {
               saveToTxt(to_do, "./to_do.txt");
               saveToJson(to_do);
-            }
+            },
+            accelerator: "Ctrl+S"
           },
           {
-            label: "New",
+            label: "Save As",
             click() {
-              newFile();
-            }
+              writeTxt();
+            },
+            accelerator: "Ctrl+Shift+S"
           },
+
           {
             label: "Open",
             click() {
               openFile();
-            }
+            },
+            accelerator: "Ctrl+O"
           },
           {
             label: "Export",
@@ -169,12 +198,6 @@ async function createWindow() {
                 click() {
                   word.writeWord(to_do, sorting);
                 }
-              },
-              {
-                label: "Txt",
-                click() {
-                  writeTxt();
-                }
               }
             ]
           },
@@ -182,7 +205,8 @@ async function createWindow() {
             label: "Quit",
             click() {
               app.quit();
-            }
+            },
+            accelerator: "Ctrl+Q"
           }
         ]
       },

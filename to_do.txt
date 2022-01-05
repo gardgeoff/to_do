@@ -1,12 +1,9 @@
-x (A) 2022-12-01 this project was created in the future! +future_projects @doesn't-exist due:2022-04-01 poc:poc_1 sprint:sprint_1 extratag:something 
-x 2020-01-08 test task, predate +projectA age:40
-x 2021-12-20 2021-01-10 this is task one (32 characters)
-(A) test +projetB +projecB
-(A) testing 123
-(A) 2022-01-01 test
-(A) 2022-01-1
-this is task two, it has a little bit more text (64 characters) +project3
-this task has a long description so that we can see how tasks with a really long description looks when the user interface is resized (expanded or condensed) to fit on the screen, really long descriptions must mean the task is complicated (255 characters) @context1
-test +projetB
-testtwo +projetB
-this is a new task due:2021-12-21
+(A) this item has a priority and some text
+(B) new item 
+x (B) 2022-01-05 this item has everything and has been edited and completed +project_one @context_one sprint:sprint_1 due:2022-03-10
+this item has only text
+this item has a project +cool_project
+this item has a context @cool_context
+this item has a due date due:2022-02-05
+this item has some custom meta data sprint:sprint_1
+x 2022-01-05 this item has a start date

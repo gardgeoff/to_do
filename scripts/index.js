@@ -210,7 +210,6 @@ $(function () {
             let uid = $(ui.item).attr("raw");
             let newPrio = $(ui.item).prevAll(".banner:first").text();
             newPrio == "no priority" ? (newPrio = null) : (newPrio = newPrio);
-            console.log(newPrio);
             let newPrioRaw = newPrio != null ? "(" + newPrio + ")" : "";
             for (let i = 0; i < mainArr.length; i++) {
               if (mainArr[i].raw == uid) {
@@ -307,7 +306,6 @@ $(function () {
                 );
                 task.priority = [nextChar(priority)];
               } else if (command == "removePrio") {
-                console.log("removing prio");
                 task.raw = task.raw.replace(`(${task.priority})`, "").trim();
                 task.priority = null;
               }

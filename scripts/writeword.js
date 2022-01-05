@@ -13,7 +13,6 @@ const {
   convertInchesToTwip,
   TextRun
 } = require("docx");
-const { group } = require("console");
 exports.writeWord = function writeWord(object, groupBy, meta) {
   let unique = {};
   let distinct = [];
@@ -42,14 +41,11 @@ exports.writeWord = function writeWord(object, groupBy, meta) {
     }
   });
   let newArr = object;
-
   distinct.forEach((banner) => {
     let index = banner.index;
     let bannerName = banner.bannerName == null ? `n/a` : banner.bannerName;
     newArr[index].bannerName = bannerName;
   });
-  console.log(distinct);
-
   let filePath;
   let options = {
     title: "Save",
