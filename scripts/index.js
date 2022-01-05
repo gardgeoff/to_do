@@ -138,6 +138,7 @@ $(function () {
         });
       }
     });
+
     let included = [];
     mainArr.map((item) => {
       let newBanner;
