@@ -114,7 +114,7 @@ input[type="checkbox"] {
   font-size: 1rem;
   padding: 10px;
   padding-left: 50px;
-  word-break: break-all;
+  word-break: break-word;
   display: flex;
   align-items: center;
 }
@@ -127,6 +127,7 @@ input[type="checkbox"] {
   text-decoration: none !important;
   font-size: 1rem;
   visibility: hidden;
+  font-weight: bold;
 }
 #tooltip {
   background: #293241;
@@ -136,8 +137,37 @@ input[type="checkbox"] {
   position: fixed;
   display: none;
 }
-.edit-item {
-  visibility: none;
-  margin-left: auto;
-  text-decoration: none !important;
+.popup {
+  position: fixed;
+  z-index: 1000;
+
+  width: 50%;
+  height: 50%;
+  top: 25%;
+  left: 25%;
+  display: none;
+}
+.tag-input {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  margin: auto;
+  background: rgb(189, 189, 189);
+  padding: 2em;
+}
+#meta-select {
+  width: 100%;
+}
+.close-popup {
+  position: absolute;
+  top: 0;
+  right: 0;
+  font-weight: bold;
+}
+.btn-sort {
+  margin-top: 10px;
+  background: #ff8161;
+  color: white;
+  font-weight: bold;
 }

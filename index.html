@@ -3,13 +3,13 @@
   <head>
     <meta charset="UTF-8" />
     <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>to_do</title>
     <link rel="shortcut icon" type="image/jpg" href="./resources/icon.ico" />
     <script src="./scripts/jquery.js"></script>
     <script src="./scripts/jquery-ui-1.13.0.custom/jquery-ui.min.js"></script>
     <script src="./scripts/moment.js"></script>
-
     <link
       rel="stylesheet"
       href="./scripts/jquery-ui-1.13.0.custom/jquery-ui.min.css"
@@ -29,6 +29,15 @@
     <div id="invisibox-bottom">a</div>
     <div class="footer">
       <input id="todotext" placeholder="to do item" type="text" />
+    </div>
+    <div class="popup">
+      <div class="tag-input">
+        <button class="close-popup btn">x</button>
+        <h5>Sort by meta tag</h5>
+
+        <select id="meta-select"></select>
+        <button class="btn btn-sort">sort</button>
+      </div>
     </div>
   </body>
 </html>

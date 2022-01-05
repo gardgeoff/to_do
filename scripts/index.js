@@ -2,13 +2,54 @@ $(function () {
   // initialize empty array to hold "to do list" data
   let mainArr = [];
   let selected;
+  let currentSorting = "priority";
+  let isMeta = false;
+  let nonMeta = ["projects", "priority", "contexts", "complete"];
   // send signal to main and retrieve the locally saved data
   // assign data to mainArr array and rebuild() to generate the screen
   window.api.send("load", true);
   window.api.receive("loadedData", function (data) {
     mainArr = data;
-    rebuild();
+    rebuild(currentSorting);
   });
+  function orderArray(array) {
+    array.sort((x, y) => {
+      return x.complete - y.complete;
+    });
+    array.sort((x, y) => {
+      return x.priority < y.priority
+        ? -1
+        : x.priority > y.priority
+        ? 1
+        : !y.priority && x.priority
+        ? -1
+        : 0;
+    });
+    if (!isMeta && currentSorting != "priority") {
+      array.sort((x, y) => {
+        return x[currentSorting] < y[currentSorting]
+          ? 1
+          : x[currentSorting] > y[currentSorting]
+          ? -1
+          : !y[currentSorting] && x[currentSorting]
+          ? -1
+          : !x[currentSorting];
+      });
+    } else if (isMeta && currentSorting != "priority") {
+      array.sort((x, y) => {
+        return x.metadata[currentSorting] < y.metadata[currentSorting]
+          ? 1
+          : x.metadata[currentSorting] > y.metadata[currentSorting]
+          ? -1
+          : !y.metadata[currentSorting] && x.metadata[currentSorting]
+          ? -1
+          : 0;
+      });
+      array.sort((x, y) => {
+        return x.complete - y.complete;
+      });
+    }
+  }
   // Guy Thomas SO answer to unique id
   function uniqueid() {
     // always start with a letter (for DOM friendlyness)
@@ -23,42 +64,44 @@ $(function () {
     } while (idstr.length < 32);
     return idstr;
   }
-  // main function to rebuild the scene whenever something changes
-  function rebuild() {
-    $(".list-container").empty();
-    let banners = [];
-    let listItems = [];
+  function metaSelect() {
+    let metaKeys = [];
     mainArr.map((item) => {
-      if (item.priority && item.priority.length) {
-        !banners.includes(item.priority)
-          ? banners.push(`${item.priority}`)
-          : null;
-      } else if (!item.priority) {
-        !banners.includes("no_priority") ? banners.push("no_priority") : null;
+      for (key in item.metadata) {
+        metaKeys.includes(key)
+          ? null
+          : key === "uid"
+          ? null
+          : metaKeys.push(key);
       }
-      listItems.push(item);
     });
-    // sort priority alphabetically
-    // sort no priority last
-    listItems.sort((x, y) => {
-      return x.complete - y.complete;
-    });
-    listItems.sort((x, y) => {
-      return x.priority < y.priority
-        ? -1
-        : x.priority > y.priority
-        ? 1
-        : !y.priority && x.priority
-        ? -1
-        : 0;
+    metaKeys.map((key) => {
+      let selectOption = `<option value="${key}">${key}</option> `;
+      $("#meta-select").append(selectOption);
     });
 
+    $(".popup").fadeIn("fast");
+  }
+
+  // main function to rebuild the scene whenever something changes
+  function rebuild(sortby) {
+    currentSorting = sortby;
+    if (nonMeta.includes(currentSorting)) {
+      isMeta = false;
+    }
+    console.log(`rebuild sorted by: ${sortby}`);
+    $(".list-container").empty();
+    let banners = [];
+
+    orderArray(mainArr);
     // makeSortable() causes lists to be drag and drop
     makeSortable();
-    listItems.map((item) => {
+    mainArr.map((item) => {
       let raw = item.raw;
       let prio = item.priority;
-      let dateCreated = item.dateCreated || "";
+      let dateCreated = item.dateCreated
+        ? item.dateCreated.substring(0, 10)
+        : "";
       let text = item.text;
       let uid = item.metadata.uid;
       let projects = item.projects.join(" +");
@@ -74,7 +117,6 @@ $(function () {
         }
       }
       let metaString = metaArr.join(" ");
-
       let baseDiv = `
       <div
         raw="${raw}"
@@ -87,34 +129,62 @@ $(function () {
           <span class="raw-text line-through">${
             prio ? `(${prio})` : ""
           } ${dateCreated} ${text} ${projects} ${contexts} ${metaString} </span>
-          <button class="del-item btn btn-danger">delete</button>
+          <button class="del-item btn btn-danger">-</button>
       </div>`;
-
       $(".list-container").append(baseDiv);
-
       if (item.complete) {
         $(`input[connected=${uid}]`).prop("checked", true).siblings().css({
           textDecoration: "line-through"
         });
       }
     });
-
-    !banners.includes("null") ? banners.push("null") : null;
-    banners.map((item) => {
-      let insert;
-      let string;
-
-      if (item != "null" && item != "complete") {
-        insert = $("." + item).first();
-        string = `<div class="banner banner-${item}">${item}</div>`;
-      } else {
-        insert = $(".null").first();
-        string = `<div class="banner banner-${item}">no priority</div>`;
+    let included = [];
+    mainArr.map((item) => {
+      let newBanner;
+      if (!isMeta) {
+        if (item[currentSorting]) {
+          if (item[currentSorting].length > 0) {
+            newBanner = item[currentSorting].toString();
+          } else if (currentSorting == "complete") {
+            newBanner = `complete`;
+          } else {
+            newBanner = `no ${currentSorting}`;
+          }
+        } else {
+          newBanner =
+            currentSorting == "complete"
+              ? `not ${currentSorting}`
+              : `no ${currentSorting}`;
+        }
+        if (!included.includes(newBanner)) {
+          banners.push({ bannerName: newBanner, insertAt: item.metadata.uid });
+          included.push(newBanner);
+        }
+      } else if (isMeta) {
+        if (item.metadata[currentSorting]) {
+          if (item.metadata[currentSorting].length > 0) {
+            newBanner = item.metadata[currentSorting].toString();
+          } else {
+            newBanner = `no ${currentSorting}`;
+          }
+        } else {
+          newBanner = `no ${currentSorting}`;
+        }
+        if (!included.includes(newBanner)) {
+          banners.push({ bannerName: newBanner, insertAt: item.metadata.uid });
+          included.push(newBanner);
+        }
       }
-      $(string).insertBefore(insert);
     });
+    banners.map((item) => {
+      let id = item.insertAt;
+      let bannerText = `<div class="banner">${item.bannerName}</div>`;
+      $(bannerText).insertBefore(`div[uid="${id}"]`);
+    });
+
     checkDates();
   }
+
   function checkDates() {
     $(".list-item").each(function (i, mainArr) {
       let dueDate = $(mainArr).attr("due");
@@ -127,7 +197,7 @@ $(function () {
   }
   function addNewLine(obj) {
     mainArr.push(obj);
-    rebuild();
+    rebuild(currentSorting);
   }
   function makeSortable() {
     $(".sortable")
@@ -135,15 +205,26 @@ $(function () {
         containment: "parent",
         cancel: ".banner",
         stop: function (event, ui) {
-          let uid = $(ui.item).attr("raw");
-          let newPrio = $(ui.item).prevAll(".banner:first").text();
-          newPrio == "no priority" ? (newPrio = null) : (newPrio = newPrio);
-          for (let i = 0; i < mainArr.length; i++) {
-            if (mainArr[i].raw == uid) {
-              mainArr[i].priority = newPrio;
+          if (currentSorting == "priority") {
+            let uid = $(ui.item).attr("raw");
+            let newPrio = $(ui.item).prevAll(".banner:first").text();
+            newPrio == "no priority" ? (newPrio = null) : (newPrio = newPrio);
+            console.log(newPrio);
+            let newPrioRaw = newPrio != null ? "(" + newPrio + ")" : "";
+            for (let i = 0; i < mainArr.length; i++) {
+              if (mainArr[i].raw == uid) {
+                if (mainArr[i].priority != null) {
+                  mainArr[i].raw = mainArr[i].raw
+                    .replace("(" + mainArr[i].priority + ")", newPrioRaw)
+                    .trim();
+                } else {
+                  mainArr[i].raw = newPrioRaw + " " + mainArr[i].raw;
+                }
+                mainArr[i].priority = newPrio;
+              }
             }
+            rebuild(currentSorting);
           }
-          rebuild();
         },
         update: function () {
           var tempItems = [];
@@ -178,13 +259,22 @@ $(function () {
   }
 
   function editItem(command) {
-    console.log("called", command);
+    if (command === "groupPrio") {
+      rebuild("priority");
+    } else if (command === "groupProj") {
+      rebuild("projects");
+    } else if (command === "groupContext") {
+      rebuild("contexts");
+    } else if (command === "groupMeta") {
+      metaSelect();
+    } else if (command === "complete") {
+      rebuild("complete");
+    }
     if (selected) {
       let item = mainArr.find((e) => {
         return e.metadata.uid == selected;
       });
       if (command === "alter text") {
-        console.log("called");
         let text = item.raw;
         if (text.includes("uid:")) {
           text = text.substring(0, text.indexOf("uid:"));
@@ -193,25 +283,41 @@ $(function () {
         mainArr = mainArr.filter((item) => {
           return item.metadata.uid != selected;
         });
-      } else if (command === "upPrio" || command === "downPrio") {
-        let priority = item.priority;
+      } else if (
+        command === "upPrio" ||
+        command === "downPrio" ||
+        command == "removePrio"
+      ) {
+        let [priority] = item.priority;
         if (priority) {
           let uid = item.metadata.uid;
           mainArr.forEach((task) => {
             if (task.metadata.uid === uid) {
-              command == "upPrio"
-                ? (task.priority = prevChar(priority))
-                : (task.priority = nextChar(priority));
+              if (command == "upPrio") {
+                task.raw = task.raw.replace(
+                  `(${task.priority})`,
+                  "(" + prevChar(priority) + ")"
+                );
+                task.priority = [prevChar(priority)];
+              } else if (command == "downPrio") {
+                task.raw = task.raw.replace(
+                  `(${task.priority})`,
+                  "(" + nextChar(priority) + ")"
+                );
+                task.priority = [nextChar(priority)];
+              } else if (command == "removePrio") {
+                console.log("removing prio");
+                task.raw = task.raw.replace(`(${task.priority})`, "").trim();
+                task.priority = null;
+              }
             }
           });
         }
-        console.log(mainArr);
+      } else if (command === "removePrio") {
       }
-      rebuild();
-      selected = null;
+      rebuild(currentSorting);
     }
   }
-
   $("#todotext").on("keydown", function (e) {
     if (e.key === "Enter") {
       let uid = uniqueid();
@@ -231,7 +337,6 @@ $(function () {
   });
   window.api.receive("edit", function (data) {
     let command = data.command;
-
     editItem(command);
   });
   $(document).on("click", ".check", function () {
@@ -241,7 +346,10 @@ $(function () {
       for (let i = 0; i < mainArr.length; i++) {
         if (mainArr[i].metadata.uid == connected) {
           mainArr[i].complete = true;
-          rebuild();
+          if (!mainArr[i].raw.startsWith("x ")) {
+            mainArr[i].raw = "x " + mainArr[i].raw;
+          }
+          rebuild(currentSorting);
         }
       }
     } else {
@@ -250,7 +358,10 @@ $(function () {
       for (let i = 0; i < mainArr.length; i++) {
         if (mainArr[i].metadata.uid == connected) {
           mainArr[i].complete = false;
-          rebuild();
+          if (mainArr[i].raw.startsWith("x ")) {
+            mainArr[i].raw = mainArr[i].raw.replace("x ", "");
+          }
+          rebuild(currentSorting);
         }
       }
     }
@@ -262,6 +373,9 @@ $(function () {
 
     // ctrl + s to save
     if (keys[17] && keys[83]) {
+      mainArr.forEach((item) => {
+        item.raw = item.raw.trim();
+      });
       window.api.send("saveFile", { data: mainArr });
     }
   });
@@ -280,7 +394,6 @@ $(function () {
       }
     });
   });
-
   $(document).on("mouseup", ".list-item", function (e) {
     if (this === e.target) {
       let xPos = e.pageX;
@@ -307,15 +420,34 @@ $(function () {
       }
     }
   });
+
   $(document).on("click", ".del-item", function () {
     let uid = $(this).closest(".list-item").attr("uid");
     $(this).closest(".list-item").hide();
     mainArr = mainArr.filter((item) => {
       return item.metadata.uid != uid;
     });
-    rebuild();
+    rebuild(currentSorting);
   });
+  $("#meta-select").on("change", function () {
+    currentSorting = $("#meta-select").val();
 
+    isMeta = true;
+    rebuild(currentSorting);
+  });
+  $(".btn-sort").on("click", function () {
+    currentSorting = $("#meta-select").val();
+    isMeta = true;
+    rebuild(currentSorting);
+  });
+  $(".sort-btn").on("change", function () {
+    currentSorting = $("#meta-select").val();
+    isMeta = true;
+    rebuild(currentSorting);
+  });
+  $(".close-popup").on("click", function () {
+    $(".popup").fadeOut("fast");
+  });
   $(document)
     .on("mouseover", ".list-item", function () {
       $(this).find(".del-item:first").css("visibility", "visible");

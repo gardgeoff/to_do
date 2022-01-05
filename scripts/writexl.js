@@ -24,12 +24,12 @@ exports.writeXl = function writeXl(object) {
       { header: "sprint", key: "sprint", width: 10 },
       { header: "poc", key: "poc", width: 10 }
     ];
-
+    worksheet.getRow(1).font = { bold: true };
     object.forEach((item) => {
       let projects = item.projects;
       let contexts = item.contexts;
       item.projects = Array.isArray(projects) ? projects.join(", ") : projects;
-      item.contexts = Array.isArray(contexts) ? contexts.join(", ") : "";
+      item.contexts = Array.isArray(contexts) ? contexts.join(", ") : contexts;
       item.complete = item.complete ? "x" : "";
       item.metadata.sprint ? (item.sprint = item.metadata.sprint) : null;
       item.metadata.poc ? (item.poc = item.metadata.poc) : null;

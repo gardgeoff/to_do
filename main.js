@@ -12,6 +12,8 @@ const path = require("path");
 let word = require("./scripts/writeword");
 let excel = require("./scripts/writexl");
 let to_do;
+let sorting = "priority";
+
 // Guy Thomas SO answer for unique id
 function uniqueid() {
   // always start with a letter (for DOM friendlyness)
@@ -60,18 +62,21 @@ function stripText(string) {
   }
   if (text.includes("@")) {
     text = text.substring(0, text.indexOf("@"));
-  } else if (text.includes("due:")) {
+  }
+  if (text.includes("due:")) {
     text = text.substring(0, text.indexOf("due:"));
-  } else if (text.includes("sprint:")) {
+  }
+  if (text.includes("sprint:")) {
     text = text.substring(0, text.indexOf("sprint:"));
-  } else if (text.includes("poc:")) {
+  }
+  if (text.includes("poc:")) {
     text = text.substring(0, text.indexOf("poc:"));
     // tests for any other meta data strings using the format foo:bar
-  } else if (/\w+:\w/gm.test(text)) {
-    text = text.substring(0, text.indexOf(text.match(/\w+:\w/gm)[0]));
-  } else {
-    text = text;
   }
+  if (/\w+:\w/gm.test(text)) {
+    text = text.substring(0, text.indexOf(text.match(/\w+:\w/gm)[0]));
+  }
+
   return text;
 }
 function readTxtFile(directory) {
@@ -129,44 +134,44 @@ async function createWindow() {
   Menu.setApplicationMenu(
     Menu.buildFromTemplate([
       {
-        label: "file",
+        label: "File",
         submenu: [
           {
-            label: "save",
+            label: "Save",
             click() {
               saveToTxt(to_do, "./to_do.txt");
               saveToJson(to_do);
             }
           },
           {
-            label: "new",
+            label: "New",
             click() {
               newFile();
             }
           },
           {
-            label: "open",
+            label: "Open",
             click() {
               openFile();
             }
           },
           {
-            label: "export",
+            label: "Export",
             submenu: [
               {
-                label: "excel",
+                label: "Excel",
                 click() {
                   excel.writeXl(to_do);
                 }
               },
               {
-                label: "word",
+                label: "Word",
                 click() {
-                  word.writeWord(to_do);
+                  word.writeWord(to_do, sorting);
                 }
               },
               {
-                label: "txt",
+                label: "Txt",
                 click() {
                   writeTxt();
                 }
@@ -174,7 +179,7 @@ async function createWindow() {
             ]
           },
           {
-            label: "quit",
+            label: "Quit",
             click() {
               app.quit();
             }
@@ -182,35 +187,86 @@ async function createWindow() {
         ]
       },
       {
-        label: "edit",
+        label: "Edit",
         submenu: [
           {
-            label: "increase priority",
+            label: "Increase Priority",
             click() {
               sendEdit("upPrio");
             },
-            accelerator: "Ctrl+Up"
+            accelerator: "Alt+Up"
           },
           {
-            label: "decrease priority",
+            label: "Decrease Priority",
             click() {
               sendEdit("downPrio");
             },
-            accelerator: "Ctrl+Down"
+            accelerator: "Alt+Down"
           },
           {
-            label: "alter text",
+            label: "Remove Priority",
+            click() {
+              sendEdit("removePrio");
+            }
+          },
+          {
+            label: "Alter Text",
             click() {
               sendEdit("alter text");
             },
             accelerator: "Ctrl+E"
           },
           {
-            label: "open dev tools",
+            label: "Open Dev Tools",
             click() {
               win.openDevTools();
             },
             accelerator: "Ctrl+Shift+I"
+          }
+        ]
+      },
+      {
+        label: "Group",
+        submenu: [
+          {
+            label: "Priority",
+            click() {
+              sendEdit("groupPrio");
+              sorting = "priority";
+            },
+            accelerator: "Ctrl+1"
+          },
+          {
+            label: "Project",
+            click() {
+              sendEdit("groupProj");
+              sorting = "projects";
+            },
+            accelerator: "Ctrl+2"
+          },
+          {
+            label: "Context",
+            click() {
+              sendEdit("groupContext");
+              sorting = "contexts";
+            },
+            accelerator: "Ctrl+3"
+          },
+          {
+            label: "Complete",
+            click() {
+              sendEdit("complete");
+              sorting = "complete";
+            },
+            accelerator: "Ctrl+4"
+          },
+          {
+            label: "Metadata Tag",
+            click() {
+              sendEdit("groupMeta");
+              sorting = "metadata";
+            },
+            accelerator: "Ctrl+5"
           }
         ]
       }
